@@ -2539,6 +2539,167 @@ test('simulation: clearing state resets the engine estimate to a zeroed card', f
   assert.ok(cleared.comboDiscountRate === 0, 'no combo discount with an empty selection');
 });
 
+/* ================================================================== */
+/* Phase 5: PIPEDA privacy redaction on the public bay tracker        */
+/* ================================================================== */
+
+group('Phase 5 - Privacy Redaction (PIPEDA)');
+
+test('maskCustomerName formats first name plus last-name initial', function () {
+  assert.strictEqual(Engine.maskCustomerName('Priya Grewal'), 'Priya G.');
+  assert.strictEqual(Engine.maskCustomerName('Marcus Vance'), 'Marcus V.');
+  assert.strictEqual(Engine.maskCustomerName('  Don   Miller '), 'Don M.');
+  assert.strictEqual(Engine.maskCustomerName('Mary Jane Watson'), 'Mary W.');
+  assert.strictEqual(Engine.maskCustomerName('Madonna'), 'Madonna');
+});
+
+test('maskCustomerName falls back to Customer Vehicle for empty or invalid input', function () {
+  assert.strictEqual(Engine.maskCustomerName(''), 'Customer Vehicle');
+  assert.strictEqual(Engine.maskCustomerName('   '), 'Customer Vehicle');
+  assert.strictEqual(Engine.maskCustomerName(null), 'Customer Vehicle');
+  assert.strictEqual(Engine.maskCustomerName(undefined), 'Customer Vehicle');
+  assert.strictEqual(Engine.maskCustomerName(42), 'Customer Vehicle');
+});
+
+test('maskLicensePlate masks leading letters and keeps trailing identifiers', function () {
+  assert.strictEqual(Engine.maskLicensePlate('CJKD 905'), '*** 905');
+  assert.strictEqual(Engine.maskLicensePlate('CJDK 905'), '*** 905');
+  assert.strictEqual(Engine.maskLicensePlate('BVXK 482'), '*** 482');
+  assert.strictEqual(Engine.maskLicensePlate('bvxk 482'), '*** 482');
+  assert.strictEqual(Engine.maskLicensePlate('DTRM 118'), '*** 118');
+  assert.strictEqual(Engine.maskLicensePlate('SIMB-177'), '***-177');
+  assert.strictEqual(Engine.maskLicensePlate('482'), '482');
+  assert.strictEqual(Engine.maskLicensePlate(''), '\u2014');
+  assert.strictEqual(Engine.maskLicensePlate(null), '\u2014');
+});
+
+test('maskPhoneNumber keeps only the last four digits', function () {
+  assert.strictEqual(Engine.maskPhoneNumber('(905) 555-0192'), '***-***-0192');
+  assert.strictEqual(Engine.maskPhoneNumber('905-555-0192'), '***-***-0192');
+  assert.strictEqual(Engine.maskPhoneNumber('9055550192'), '***-***-0192');
+  assert.strictEqual(Engine.maskPhoneNumber('0148'), '***-***-0148');
+  assert.strictEqual(Engine.maskPhoneNumber(''), '***');
+  assert.strictEqual(Engine.maskPhoneNumber(null), '***');
+});
+
+test('unauthenticated lookupWorkOrder returns a sanitized public view', function () {
+  var view = Engine.lookupWorkOrder('REV-3105');
+  assert.strictEqual(view.code, 'REV-3105');
+  assert.strictEqual(view.customerName, 'Priya G.');
+  assert.strictEqual(view.licensePlate, '*** 905');
+  assert.strictEqual(view.phone, '***-***-0192');
+  assert.strictEqual(view.estimatedTotal, null,
+    'financial invoice totals must be omitted from the public view');
+  assert.strictEqual(view.sanitized, true);
+  assert.strictEqual(view.currentState, 'PARTS_ORDERED',
+    'operational status stays visible for tracking');
+  var serialized = JSON.stringify(view);
+  assert.ok(serialized.indexOf('Priya Grewal') === -1,
+    'the full customer name must never appear in the public view');
+  assert.ok(serialized.indexOf('555-0192') === -1,
+    'the unmasked phone number must never appear in the public view');
+  assert.ok(serialized.indexOf('CJDK') === -1,
+    'the unmasked license plate letters must never appear in the public view');
+  assert.ok(serialized.indexOf('1128.6') === -1,
+    'the invoice total must never appear in the public view');
+});
+
+test('unauthenticated lookups by phone query or bare code are also sanitized', function () {
+  var byPhone = Engine.lookupWorkOrder('(905) 555-0192');
+  assert.strictEqual(byPhone.customerName, 'Priya G.');
+  assert.strictEqual(byPhone.sanitized, true);
+  var bareNumber = Engine.lookupWorkOrder(' 2048 ');
+  assert.strictEqual(bareNumber.customerName, 'Marcus V.');
+  assert.strictEqual(bareNumber.sanitized, true);
+  assert.ok(JSON.stringify(bareNumber).indexOf('Marcus Vance') === -1);
+});
+
+test('phone-verified lookupWorkOrder still returns the full work order', function () {
+  var full = Engine.lookupWorkOrder('REV-2048', 'BVXK 482');
+  assert.strictEqual(full.customerName, 'Marcus Vance');
+  assert.strictEqual(full.licensePlate, 'BVXK 482');
+  assert.strictEqual(full.estimatedTotal, 615.84);
+  assert.strictEqual(full.sanitized, undefined,
+    'authenticated views must not be flagged as sanitized');
+});
+
+test('lookupWorkOrder public view never leaks seed PII across all three seeds', function () {
+  ['REV-2048', 'REV-3105', 'REV-4092'].forEach(function (code) {
+    var view = Engine.lookupWorkOrder(code);
+    assert.strictEqual(view.sanitized, true);
+    var serialized = JSON.stringify(view);
+    ['Marcus Vance', 'Priya Grewal', 'Elena Rostova',
+      'BVXK 482', 'CJDK 905', 'DTRM 118'].forEach(function (leak) {
+      assert.ok(serialized.indexOf(leak) === -1,
+        code + ' public view must not contain: ' + leak);
+    });
+  });
+});
+
+test('app.js tracker notes render masked PII only', function () {
+  ['Engine.maskCustomerName', 'Engine.maskLicensePlate',
+    '| Customer: ', '| Plate: '
+  ].forEach(function (fragment) {
+    assert.ok(APP_JS.indexOf(fragment) !== -1,
+      'tracker notes must render: ' + fragment);
+  });
+  assert.ok(APP_JS.indexOf("typeof workOrder.estimatedTotal === 'number'") !== -1,
+    'invoice totals must be guarded so sanitized views omit them');
+  ['Marcus Vance', 'Priya Grewal', 'Elena Rostova'].forEach(function (name) {
+    assert.ok(APP_JS.indexOf(name) === -1,
+      'app.js must never embed the unmasked seed customer name: ' + name);
+  });
+});
+
+test('app.js routes blank verification through the sanitized public view', function () {
+  assert.ok(APP_JS.indexOf('var verification') !== -1,
+    'trackVehicle must normalize the phone/plate verification value');
+  assert.ok(APP_JS.indexOf('lookupWorkOrder(code, verification') !== -1,
+    'trackVehicle must pass the normalized verification to lookupWorkOrder');
+  assert.ok(APP_JS.indexOf("phoneOrPlate.trim()) ? phoneOrPlate : null") !== -1,
+    'a blank phone/plate field must be treated as an unauthenticated query');
+});
+
+test('demo presets are collapsed behind the staff toggle on both tracker surfaces', function () {
+  [INDEX_HTML, TRACK_HTML].forEach(function (html) {
+    assert.ok(html.indexOf('id="tracker-demo-tools"') !== -1, '#tracker-demo-tools required');
+    assert.ok(html.indexOf('id="btn-toggle-demo"') !== -1, '#btn-toggle-demo required');
+    assert.ok(html.indexOf('class="tracker-demo-tools is-collapsed"') !== -1,
+      'the demo tools must ship collapsed by default');
+    assert.ok(html.indexOf('Staff / Demo Presets') !== -1,
+      'the toggle must be labelled Staff / Demo Presets');
+    assert.ok(html.indexOf('id="btn-track-sample-1"') !== -1,
+      'sample button 1 ID must be preserved');
+    assert.ok(html.indexOf('id="btn-track-sample-2"') !== -1,
+      'sample button 2 ID must be preserved');
+  });
+});
+
+test('app.js implements the demo toggle and the ?demo=1 auto-open', function () {
+  ['bindDemoTools', 'isDemoModeFromUrl', "get('demo') === '1'",
+    'is-collapsed', 'aria-expanded', 'aria-controls'
+  ].forEach(function (fragment) {
+    assert.ok(APP_JS.indexOf(fragment) !== -1,
+      'demo tooling must implement: ' + fragment);
+  });
+});
+
+test('styles.css keeps the demo presets hidden until toggled', function () {
+  assert.ok(STYLES_CSS.indexOf('.tracker-demo-tools.is-collapsed .tracker-samples') !== -1,
+    'collapsed demo tools must hide the sample buttons');
+  assert.ok(STYLES_CSS.indexOf('.tracker-demo-tools') !== -1,
+    'the demo tools container must be styled');
+});
+
+test('anti-drift: the Phase 5 DOM IDs exist verbatim on every surface that uses them', function () {
+  ['tracker-demo-tools', 'btn-toggle-demo'].forEach(function (id) {
+    [INDEX_HTML, TRACK_HTML].forEach(function (html) {
+      assert.ok(html.indexOf('id="' + id + '"') !== -1,
+        'missing Phase 5 DOM ID on a tracker surface: #' + id);
+    });
+  });
+});
+
 /* ------------------------------------------------------------------ */
 /* report                                                              */
 /* ------------------------------------------------------------------ */

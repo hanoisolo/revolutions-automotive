@@ -55,9 +55,12 @@
           <button id="btn-track-vehicle" type="button" class="btn btn-primary btn-track">Track My Vehicle</button>
           <button id="btn-track-clear" type="button" class="btn btn-sample-alt btn-track-clear">Clear / Reset Search</button>
         </div>
-        <div class="tracker-samples">
-          <button id="btn-track-sample-1" type="button" class="btn btn-sample-alt">Load REV-2048: In Bay</button>
-          <button id="btn-track-sample-2" type="button" class="btn btn-sample-alt">Load REV-3105: Parts Ordered</button>
+        <div id="tracker-demo-tools" class="tracker-demo-tools is-collapsed">
+          <button id="btn-toggle-demo" type="button" class="btn btn-sample-alt btn-toggle-demo">Staff / Demo Presets &darr;</button>
+          <div class="tracker-samples">
+            <button id="btn-track-sample-1" type="button" class="btn btn-sample-alt">Load REV-2048: In Bay</button>
+            <button id="btn-track-sample-2" type="button" class="btn btn-sample-alt">Load REV-3105: Parts Ordered</button>
+          </div>
         </div>
         <div id="tracker-feedback" class="tracker-feedback" aria-live="polite"></div>
         <ol id="tracker-status-timeline" class="tracker-status-timeline" aria-label="Repair progress stages">

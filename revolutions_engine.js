@@ -1819,6 +1819,71 @@
     return normalizePlate(term) === normalizePlate(workOrder.licensePlate);
   }
 
+  /* ================================================================== */
+  /* Phase 5: PIPEDA privacy redaction helpers                          */
+  /* ================================================================== */
+
+  /*
+   * maskCustomerName(name)
+   * Redacts a customer name to the first name plus the last-name initial
+   * ("Priya Grewal" -> "Priya G."). Empty or invalid input falls back to
+   * the neutral label "Customer Vehicle".
+   */
+  function maskCustomerName(name) {
+    if (typeof name !== 'string') return 'Customer Vehicle';
+    var parts = name.trim().split(/\s+/).filter(function (part) { return part.length > 0; });
+    if (parts.length === 0) return 'Customer Vehicle';
+    if (parts.length === 1) return parts[0];
+    return parts[0] + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + '.';
+  }
+
+  /*
+   * maskLicensePlate(plate)
+   * Masks the leading letter block of every token ("CJKD 905" -> "*** 905",
+   * "DTRM-118" -> "***-118") while keeping trailing identifiers visible.
+   * Empty or invalid input falls back to an em dash placeholder.
+   */
+  function maskLicensePlate(plate) {
+    if (typeof plate !== 'string') return '\u2014';
+    var tokens = plate.trim().split(/\s+/).filter(function (token) { return token.length > 0; });
+    if (tokens.length === 0) return '\u2014';
+    return tokens.map(function (token) {
+      return token.replace(/^[A-Za-z]+/, '***');
+    }).join(' ');
+  }
+
+  /*
+   * maskPhoneNumber(phone)
+   * Keeps only the last four digits of a phone number
+   * ("(905) 555-0192" -> "***-***-0192"). Inputs with fewer than four
+   * digits collapse to "***".
+   */
+  function maskPhoneNumber(phone) {
+    if (typeof phone !== 'string') return '***';
+    var digits = phoneDigits(phone);
+    if (digits.length < 4) return '***';
+    return '***-***-' + digits.slice(-4);
+  }
+
+  /*
+   * toPublicWorkOrderView(workOrder)
+   * Builds the sanitized unauthenticated view of a work order: customer
+   * name and license plate are masked, the phone number keeps only the
+   * last four digits, and the financial invoice total is omitted.
+   */
+  function toPublicWorkOrderView(workOrder) {
+    var view = {};
+    for (var prop in workOrder) {
+      if (Object.prototype.hasOwnProperty.call(workOrder, prop)) view[prop] = workOrder[prop];
+    }
+    view.customerName = maskCustomerName(workOrder.customerName);
+    view.phone = maskPhoneNumber(workOrder.phone);
+    view.licensePlate = maskLicensePlate(workOrder.licensePlate);
+    view.estimatedTotal = null;
+    view.sanitized = true;
+    return view;
+  }
+
   /*
    * lookupWorkOrder(query, phoneOrPlate, customWorkOrders)
    * Matches a work order by code (case/spacing-insensitive, bare 4-digit
@@ -1826,10 +1891,16 @@
    * normalized Ontario license plate. When phoneOrPlate is supplied together
    * with a matching code it acts as a verification filter: a mismatch on both
    * phone and plate returns null. Returns the work order object or null.
+   * PIPEDA: when phoneOrPlate is not provided (undefined or null) the lookup
+   * is unauthenticated and a sanitized public view is returned instead of
+   * the raw record - the full customer name, unmasked phone and financial
+   * invoice totals are omitted. Passing an empty string preserves the
+   * legacy internal bridge semantics (raw record) for the booking flow.
    */
   function lookupWorkOrder(query, phoneOrPlate, customWorkOrders) {
     var queryRaw = typeof query === 'string' ? query.trim() : '';
     var secondaryRaw = typeof phoneOrPlate === 'string' ? phoneOrPlate.trim() : '';
+    var unauthenticated = phoneOrPlate === undefined || phoneOrPlate === null;
     if (!queryRaw && !secondaryRaw) return null;
 
     var pool = (Array.isArray(customWorkOrders) ? customWorkOrders.slice() : []).concat(SEED_WORK_ORDERS);
@@ -1839,7 +1910,9 @@
       for (var i = 0; i < pool.length; i++) {
         var candidate = pool[i];
         if (normalizeWorkOrderCode(candidate.code) === queryCode) {
-          if (!secondaryRaw) return candidate;
+          if (!secondaryRaw) {
+            return unauthenticated ? toPublicWorkOrderView(candidate) : candidate;
+          }
           if (phoneOrPlateMatches(candidate, secondaryRaw)) return candidate;
           return null;
         }
@@ -1847,7 +1920,9 @@
     }
 
     for (var j = 0; j < pool.length; j++) {
-      if (queryRaw && phoneOrPlateMatches(pool[j], queryRaw)) return pool[j];
+      if (queryRaw && phoneOrPlateMatches(pool[j], queryRaw)) {
+        return unauthenticated ? toPublicWorkOrderView(pool[j]) : pool[j];
+      }
     }
     for (var k = 0; k < pool.length; k++) {
       if (secondaryRaw && phoneOrPlateMatches(pool[k], secondaryRaw)) return pool[k];
@@ -2308,6 +2383,9 @@
     evaluateSafetyPreCheck: evaluateSafetyPreCheck,
     lookupWorkOrder: lookupWorkOrder,
     createWorkOrder: createWorkOrder,
+    maskCustomerName: maskCustomerName,
+    maskLicensePlate: maskLicensePlate,
+    maskPhoneNumber: maskPhoneNumber,
     TIER_CONFIG_DEFAULTS: TIER_CONFIG_DEFAULTS,
     SEO_SCHEMA_DATA: SEO_SCHEMA_DATA,
     parseTireSize: parseTireSize,

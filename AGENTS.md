@@ -128,3 +128,26 @@ growth from 207):
   `track.html?code=REV-XXXX` and the safety book CTA pre-selects
   `mto_safety_exhaust` and redirects to `index.html#booking-form`.
 Gate: `node test_revolutions.js` (224/224 PASSED).
+
+**Phase 5 complete.** PIPEDA privacy redaction on the public bay tracker
+(238/238 total, append-only test growth from 224):
+- Engine: `maskCustomerName` ("Priya Grewal" -> "Priya G.", empty/invalid ->
+  "Customer Vehicle"), `maskLicensePlate` ("CJKD 905" -> "*** 905"),
+  `maskPhoneNumber` ("(905) 555-0192" -> "***-***-0192"), all exported for
+  unit testing. `lookupWorkOrder(query, phoneOrPlate)` now returns a
+  sanitized public view (masked name/phone/plate, invoice total omitted,
+  `sanitized: true`) when `phoneOrPlate` is omitted or null; a provided
+  phone/plate still acts as secondary verification and returns the full
+  record. Passing an empty string preserves the legacy internal bridge
+  semantics used by the booking flow.
+- Controller: `trackVehicle` converts a blank phone/plate field to an
+  unauthenticated (null) query, so public lookups always render the
+  sanitized view; `#tracker-technician-notes` never outputs the full last
+  name or unmasked plate (`[Year Make Model] | Customer: Priya G. | Plate:
+  *** 905`) and omits the estimated total for sanitized views.
+- Demo cleanup: `#btn-track-sample-1/2` preserved but wrapped in a
+  collapsed `#tracker-demo-tools` container behind the discreet
+  `#btn-toggle-demo` ("Staff / Demo Presets"); `?demo=1` in the URL or the
+  toggle reveals them. Customers see only the code/phone inputs, track and
+  clear buttons.
+Gate: `node test_revolutions.js` (238/238 PASSED).

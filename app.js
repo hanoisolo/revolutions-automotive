@@ -999,14 +999,19 @@
 
     var meta = document.createElement('p');
     meta.className = 'tracker-notes-meta';
-    meta.textContent = workOrder.vehicle + ' (' + workOrder.vehicleType + ') for ' +
-      workOrder.customerName + ' - Plate ' + workOrder.licensePlate + '.';
+    /* PIPEDA: the public tracker never renders the customer's full last
+       name or unmasked plate - always the masked forms. */
+    meta.textContent = workOrder.vehicle + ' | Customer: ' +
+      Engine.maskCustomerName(workOrder.customerName) + ' | Plate: ' +
+      Engine.maskLicensePlate(workOrder.licensePlate);
     panel.appendChild(meta);
 
     var bay = document.createElement('p');
     bay.className = 'tracker-notes-meta';
     bay.textContent = 'Bay: ' + workOrder.bayNumber + ' | Technician: ' + workOrder.technicianName +
-      ' | Estimated total: ' + fmtCAD(workOrder.estimatedTotal) + '.';
+      (typeof workOrder.estimatedTotal === 'number'
+        ? ' | Estimated total: ' + fmtCAD(workOrder.estimatedTotal)
+        : '') + '.';
     panel.appendChild(bay);
 
     var services = document.createElement('p');
@@ -1029,7 +1034,12 @@
 
   function trackVehicle(code, phoneOrPlate) {
     var feedback = document.getElementById('tracker-feedback');
-    var workOrder = Engine.lookupWorkOrder(code, phoneOrPlate, state.workOrders);
+    /* PIPEDA: a blank phone/plate field is an unauthenticated query - the
+       engine then returns the sanitized public view (masked name, phone and
+       plate, invoice totals omitted). A provided value acts as secondary
+       verification and unlocks the full record. */
+    var verification = (typeof phoneOrPlate === 'string' && phoneOrPlate.trim()) ? phoneOrPlate : null;
+    var workOrder = Engine.lookupWorkOrder(code, verification, state.workOrders);
 
     if (!workOrder) {
       renderTimeline(null);
@@ -1077,6 +1087,30 @@
     if (phoneInput) phoneInput.value = phone;
     trackVehicle(code, phone);
     return true;
+  }
+
+  /* Phase 5: Staff / demo preset tools stay out of the customer's way -
+     collapsed behind #btn-toggle-demo unless ?demo=1 is in the URL or the
+     toggle is clicked. */
+  function isDemoModeFromUrl() {
+    if (typeof window.URLSearchParams !== 'function') return false;
+    return new window.URLSearchParams(window.location.search).get('demo') === '1';
+  }
+
+  function bindDemoTools() {
+    var tools = document.getElementById('tracker-demo-tools');
+    var toggle = document.getElementById('btn-toggle-demo');
+    if (!tools || !toggle) return;
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', 'tracker-demo-tools');
+    if (isDemoModeFromUrl()) {
+      tools.classList.remove('is-collapsed');
+      toggle.setAttribute('aria-expanded', 'true');
+    }
+    toggle.addEventListener('click', function () {
+      var collapsed = tools.classList.toggle('is-collapsed');
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
   }
 
   function bindBayTracker() {
@@ -1508,6 +1542,7 @@
     if (document.getElementById('wizard-container')) bindWizard();
     if (document.getElementById('safety-checklist-container')) bindSafetyPreCheck();
     if (document.getElementById('btn-track-vehicle')) bindBayTracker();
+    bindDemoTools();
     if (document.getElementById('tire-calc-section')) bindTireCalculator();
     if (document.getElementById('voucher-modal')) bindVoucherModal();
     if (document.getElementById('owner-drawer-toggle')) bindOwnerDrawer();

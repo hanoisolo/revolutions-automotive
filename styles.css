@@ -1380,6 +1380,21 @@ input:focus, select:focus, button:focus-visible {
 
 .btn-track-clear { align-self: center; }
 
+/* Phase 5: staff / demo presets stay collapsed out of the customer view.
+   They only expand via #btn-toggle-demo or when ?demo=1 is in the URL
+   (app.js removes .is-collapsed on load). */
+.tracker-demo-tools { margin-top: 0.75rem; }
+
+.tracker-demo-tools .btn-toggle-demo {
+  font-size: 0.78rem;
+  opacity: 0.7;
+  padding: 0.35rem 0.8rem;
+}
+
+.tracker-demo-tools .tracker-samples { margin-top: 0.6rem; }
+
+.tracker-demo-tools.is-collapsed .tracker-samples { display: none; }
+
 /* The hidden attribute must win over author display rules (.safety-layout
    and similar grid/flex panels) so legacy panels stay collapsed. */
 [hidden] { display: none !important; }
