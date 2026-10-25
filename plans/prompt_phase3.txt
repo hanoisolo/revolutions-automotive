@@ -1,0 +1,240 @@
+# PHASE 3 ARCHITECTURAL SPECIFICATION REQUEST — Revolutions Automotive
+
+## ROLE
+
+You are Gemini 4 Argon, the architect model. Produce the complete Phase 3
+roadmap as **pure Markdown only** — zero tool calls, zero executable code
+fences pretending to be run, zero external links used as instructions.
+Write the output to be saved as `plans/PHASE3_ROADMAP.md`.
+
+## MANDATORY ROADMAP STRUCTURE RULES
+
+- Phase 3 must be broken into exactly **3 bite-sized segments**.
+- **1–3 code files maximum per segment.** No segment may touch more than 3
+  code files.
+- Every segment must terminate in a **headless Node test gate** runnable in
+  a plain shell: `node test_revolutions.js`. No IDE features, no GUI tools,
+  no "looks good" gates.
+- Specify **exact DOM IDs/selectors** verbatim so the Segment 3 anti-drift
+  check can assert every selector queried in `app.js` exists in
+  `index.html`.
+- **Never weaken, delete, skip, or loosen any of the existing 148 tests**
+  in `test_revolutions.js`. Phase 3 tests are strictly additive
+  (148 -> 173+).
+- Include a final **Stage 6 Audit Gate** segment: an independent Gemini 4
+  Argon audit of assertion integrity plus a git commit milestone.
+- The roadmap is pure Markdown. Include per-segment file inventory, exact
+  data schemas, function contracts, acceptance criteria, and the gate
+  command.
+- All shell commands in the roadmap must use relative parent paths with
+  forward slashes (e.g. `python ../ask_gemini.py`), zero redirects
+  (`>`, `2>`), and zero shell variables (`$?`, `$VAR`).
+
+## CLIENT CONTEXT
+
+- **Business:** Revolutions Automotive — Midas-style service, estimator &
+  appointment platform.
+- **Location:** 1-15A Fisherman Dr, Brampton, ON L7A 1B7
+- **Phone:** (905) 846-8351
+- **Specialties:** Auto repairs, auto maintenance, automobile air
+  conditioning (R134a & R1234yf), oil change (synthetic & conventional),
+  state-of-the-art computer diagnostics & repair, auto tune-ups, 4-wheel
+  laser alignments, brake services, tires (sales, mounting, balancing,
+  seasonal swap), suspensions & steering, exhaust systems, Ontario Safety
+  Standards Certificates (MTO SSC), domestic & import vehicles.
+- **Jurisdiction:** Ontario, Canada. CAD currency, 13% HST, shop supplies
+  capped at $35.00 CAD.
+
+## CURRENT PROJECT STATE (PHASES 1–2 COMPLETE, 148/148 TESTS GREEN)
+
+- **Stack:** HTML5, CSS3, Vanilla ES6+ JavaScript, zero frameworks, zero
+  build step.
+- **Engine:** `revolutions_engine.js` — dual UMD module
+  (`window.RevolutionsEngine` in browser, `module.exports` in Node),
+  strict mode, zero dependencies. Already exports `SHOP_INFO`,
+  `VEHICLE_MULTIPLIERS`, `SERVICE_CATALOG` (12 services),
+  `COUPON_CATALOG` (5 codes), `calculateEstimate(options)`,
+  `validateBooking(bookingPayload)`,
+  `recommendServicesBySymptoms(symptomsArray)`,
+  `DIAGNOSTIC_DECISION_TREE` (5 anomaly branches, 33 terminals),
+  `MTO_SSC_CHECKLIST_ITEMS` (11 areas, weights sum 100),
+  `WORK_ORDER_STATES` (6-state lifecycle), `SEED_WORK_ORDERS`
+  (`REV-2048`, `REV-3105`, `REV-4092`), `evaluateDiagnosticWizard`,
+  `evaluateSafetyPreCheck`, `lookupWorkOrder`, `createWorkOrder`.
+- **UI:** `index.html` (semantic responsive shell with Phase 1 + Phase 2
+  sections), `styles.css` (Midas industrial gold / carbon-black /
+  crimson theme, triage badges, score gauge, 6-stage timeline),
+  `app.js` (DOM controller: estimator, coupon wallet, booking, wizard,
+  MTO pre-check, bay tracker, appointment-to-tracker bridge).
+- **Persistence:** `localStorage` key `revolutions_automotive_state_v1`
+  (Phase 1 estimator/booking state + Phase 2 state incl. work orders).
+- **Assets:** `assets/hero_bay.jpg`, `assets/diagnostics_tech.jpg`,
+  `assets/safety_badge.jpg` (JPEG magic bytes `FF D8 FF` verified).
+- **Gate:** `node test_revolutions.js` — currently **148/148 PASSED**
+  (Phase 1: 91 tests; Phase 2 Segment 1: 27 engine tests;
+  Phase 2 Segment 2: 15 UI/DOM tests; Phase 2 Segment 3: 15 controller &
+  anti-drift tests).
+
+---
+
+## PHASE 3 SCOPE — PRINTABLE MIDAS VOUCHER GENERATOR, TIRE & RIM SIZE
+## CALCULATOR, LOCAL SEO SCHEMA & OWNER CONFIG DRAWER
+
+### SEGMENT 1 — ENGINE EXTENSIONS (`revolutions_engine.js` + `test_revolutions.js`)
+
+**Code files (2):** `revolutions_engine.js`, `test_revolutions.js`.
+Everything below is added to the existing dual UMD engine without touching
+existing exports or behavior.
+
+**New constants:**
+
+1. `TIER_CONFIG_DEFAULTS` — frozen shop configuration defaults:
+   - Base hourly shop labor rate: **$130.00 CAD/hr**
+   - Shop supplies rate: **5%**
+   - Supplies cap: **$35.00 CAD**
+   - Default owner PIN: **`8351`**
+   - Active coupons list (referencing existing `COUPON_CATALOG` codes).
+   Define the exact schema including any derived fields.
+2. `SEO_SCHEMA_DATA` — frozen Schema.org **`AutoRepair`** structured data
+   object for the Brampton shop, including:
+   - Geo-coordinates: `43.7196, -79.7946` (latitude/longitude)
+   - Full address: 1-15A Fisherman Dr, Brampton, ON L7A 1B7, CA
+   - Telephone: (905) 846-8351
+   - Opening hours specification (Mon–Fri 08:00–18:00, Sat 08:30–15:00,
+     Sun closed)
+   - Catalog service list derived from the 12 `SERVICE_CATALOG` entries.
+   Define the exact nested schema (required/optional properties).
+
+**New pure functions (exact contracts required in the roadmap):**
+
+1. `parseTireSize(sizeStr)` — parses metric tire size strings (e.g.
+   `"205/55R16"`, `"225/45R17"`, `"275/65R18"`) into
+   `{ width, aspectRatio, rimDiameter, sidewallHeightMm,
+      overallDiameterMm, overallDiameterInches, circumferenceMm }`.
+   Returns `null` on invalid formats. Specify the exact regex, accepted
+   formats/units, rounding rules, and the circumference formula
+   (pi x overallDiameterMm).
+2. `compareTireSizes(currentSizeStr, targetSizeStr)` — returns a comparison
+   object containing diameter difference (mm and %), sidewall difference,
+   speedometer reading at an actual 100 km/h, and a compliance rating:
+   `"safe"` if the diameter difference is within ±3.0%, `"caution"`
+   if greater than 3.0%. Returns `null` when either size is invalid.
+   Specify the exact speedometer variance formula and rounding rules.
+3. `generateVoucherData(estimatePayload, bookingPayload)` — returns a
+   structured printable voucher payload with a **30-day rolling
+   expiration date**, a formatted alphanumeric voucher code
+   (`REV-VOUCH-XXXX`), a Midas-style disclaimer, and itemized
+   subtotal / HST (13%) / total lines. Specify the exact output schema,
+   code-generation determinism rules, and expiration date computation
+   (testable, no raw `Date.now()` inside the assertion path).
+4. `exportBookingsToCsv(bookingsArray)` — converts the work orders and
+   bookings array into a clean, downloadable **RFC-4180 compliant** CSV
+   string with headers. Specify the exact column set, quoting/escaping
+   rules (embedded commas, quotes, newlines), and CRLF line endings.
+5. `validateOwnerPin(enteredPin, currentPin)` — trimmed (constant-time
+   preferred) PIN verification against the default `8351` or a configured
+   PIN. Specify exact trimming, length, and comparison rules and the
+   boolean return contract.
+
+**Unit tests (additive only):** 25+ new headless `assert` assertions in
+`test_revolutions.js` raising the total from 148 to **173+**, covering all
+five functions, both constants' invariants, and edge cases (invalid tire
+strings, boundary ±3.0% compliance, empty bookings array, CSV escaping of
+commas/quotes/newlines, wrong PIN, PIN whitespace, voucher code format,
+30-day expiry math).
+
+**Gate:** `node test_revolutions.js` — 173+ PASSED, zero prior tests
+removed or weakened.
+
+### SEGMENT 2 — PHASE 3 UI (`index.html` + `styles.css`)
+
+**Code files (3):** `index.html`, `styles.css`, `test_revolutions.js`
+(appended DOM presence tests only).
+
+Build responsive, mobile-first, accessible sections consistent with the
+existing Midas industrial theme, with these **exact DOM IDs verbatim**:
+
+- **Printable Voucher Modal & Print Layout:**
+  `#voucher-modal`, `#voucher-print-area`, `#btn-print-voucher`,
+  `#btn-close-voucher`, `#voucher-code-display`,
+  `#voucher-expiry-date`
+  - Print stylesheet `@media print` cleanly formatting only
+    `#voucher-print-area` while hiding navigation, buttons, and sidebars.
+- **Seasonal Tire & Rim Size Calculator Section:**
+  `#tire-calc-section`, `#tire-input-current`, `#tire-input-target`,
+  `#btn-calc-tires`, `#tire-comparison-results`,
+  `#tire-speedo-diff`, `#tire-fitment-badge`
+- **LocalBusiness JSON-LD Script:**
+  `<script type="application/ld+json" id="seo-schema-json">` containing
+  the Brampton AutoRepair schema from `SEO_SCHEMA_DATA`.
+- **Shop Owner Config Drawer:**
+  `#owner-drawer-toggle`, `#owner-drawer`, `#owner-pin-input`,
+  `#btn-owner-unlock`, `#owner-panel-content`,
+  `#owner-labor-rate-input`, `#owner-supplies-cap-input`,
+  `#owner-banner-text-input`, `#btn-owner-save`,
+  `#btn-owner-export-csv`, `#owner-status-feedback`
+
+The roadmap must tabulate every ID with its semantic purpose and require
+`test_revolutions.js` DOM presence assertions for all of them (additive),
+mirroring the Phase 1 / Phase 2 Segment 2 pattern. Also assert the JSON-LD
+script tag exists and parses as valid JSON containing the Brampton address
+and phone. **DOM presence tests: 12+ new assertions** raising the total
+test count from 173+ to **185+**.
+
+**Gate:** `node test_revolutions.js` — all Phase 1 + Phase 2 + Phase 3
+DOM tests green.
+
+### SEGMENT 3 — INTERACTIVE WIRING (`app.js` + ANTI-DRIFT TESTS)
+
+**Code files (2):** `app.js`, `test_revolutions.js`.
+
+- Wire the **tire calculator**: inputs `#tire-input-current` /
+  `#tire-input-target` with instant comparison via `compareTireSizes`,
+  rendered into `#tire-comparison-results`, speedometer variance shown in
+  `#tire-speedo-diff`, and the `safe` / `caution` compliance badge in
+  `#tire-fitment-badge`.
+- Wire the **voucher modal generator**: triggered from the estimate card
+  (`#btn-print-estimate`) and coupon cards, populated via
+  `generateVoucherData`, voucher code and 30-day expiry shown in
+  `#voucher-code-display` / `#voucher-expiry-date`, and native
+  `window.print()` support via `#btn-print-voucher`.
+- Wire the **owner config drawer**: `#owner-drawer-toggle` /
+  `#owner-drawer` open-close flow, PIN verification via
+  `validateOwnerPin` (default `8351`) on `#btn-owner-unlock`, live
+  updating of active shop labor rate (`#owner-labor-rate-input`) and
+  supplies cap (`#owner-supplies-cap-input`), banner notice text via
+  `#owner-banner-text-input`, persisted under
+  `revolutions_automotive_state_v1`, status feedback in
+  `#owner-status-feedback`, and CSV lead download via
+  `exportBookingsToCsv` triggered by `#btn-owner-export-csv`.
+- **Anti-drift gate:** extend the existing static regex/AST anti-drift
+  test so **100% of Phase 3 DOM IDs referenced in `app.js` exist verbatim
+  in `index.html`**, and vice versa for the Phase 3 sections. Never
+  weaken the existing Phase 1 + Phase 2 anti-drift assertions.
+
+**Unit tests (additive only):** 10+ new assertions raising the total test
+count to **~195+**.
+
+**Gate:** `node test_revolutions.js` — full regression green.
+
+### STAGE 6 AUDIT GATE
+
+After Segment 3, an independent Gemini 4 Argon audit must verify:
+- All 148 pre-Phase 3 assertions are byte-identical in intent — none
+  deleted, skipped, broadened, or loosened.
+- The final suite went green only through genuine additive tests.
+- The anti-drift DOM check covers every Phase 3 selector.
+- Verdict line format: `AUDIT VERDICT: PASS` or `AUDIT VERDICT: FAIL`.
+- End with the git commit milestone command sequence (no redirects, no
+  shell variables — plain commands only, relative parent paths with
+  forward slashes).
+
+---
+
+## OUTPUT
+
+Write `plans/PHASE3_ROADMAP.md` as pure Markdown containing: context recap,
+the 3-segment plan with exact file inventories, complete data schemas and
+function contracts, full DOM ID tables, per-segment acceptance criteria and
+gate commands, the test-count trajectory (148 -> 173+ -> 185+ -> ~195+),
+and the Stage 6 audit gate specification.

@@ -28,7 +28,14 @@
     wizardCurrentNodeId: 'step_anomaly',
     safetyAnswers: {},
     workOrders: [],
-    activeTrackedCode: 'REV-2048'
+    activeTrackedCode: 'REV-2048',
+    ownerConfig: {
+      unlocked: false,
+      laborRatePerHour: 130.00,
+      shopSuppliesCap: 35.00,
+      bannerText: '',
+      customPin: ''
+    }
   };
 
   /* -------------------------------------------------------------- */
@@ -85,7 +92,8 @@
   }
 
   function recalculateAndRenderEstimate() {
-    var result = Engine.calculateEstimate(currentEstimateOptions());
+    var result = ownerAdjustedEstimate(Engine.calculateEstimate(currentEstimateOptions()));
+    lastEstimate = result;
 
     document.getElementById('est-selected-count').textContent =
       result.serviceCount + (result.serviceCount === 1 ? ' service selected' : ' services selected');
@@ -990,6 +998,347 @@
   /* Init                                                             */
   /* -------------------------------------------------------------- */
 
+  /* ================================================================== */
+  /* Phase 3: Tire calculator, printable voucher and owner admin drawer */
+  /* ================================================================== */
+
+  var lastEstimate = null;
+
+  function round2(value) {
+    if (typeof value !== 'number' || !isFinite(value)) return 0;
+    return Math.floor(value * 100 + 0.5 + 1e-9) / 100;
+  }
+
+  /* Applies the shop owner's live labor rate / supplies cap overrides to the
+     engine estimate without mutating the frozen catalog or engine state. */
+  function ownerAdjustedEstimate(result) {
+    var cfg = state.ownerConfig || {};
+    var baseRate = Engine.TIER_CONFIG_DEFAULTS.laborRatePerHour;
+    var baseCap = Engine.TIER_CONFIG_DEFAULTS.shopSuppliesCap;
+    var rate = Number(cfg.laborRatePerHour) > 0 ? Number(cfg.laborRatePerHour) : baseRate;
+    var rawCap = Number(cfg.shopSuppliesCap);
+    var cap = (isFinite(rawCap) && rawCap >= 0) ? rawCap : baseCap;
+    var scale = rate / baseRate;
+    if (scale === 1 && cap === baseCap) return result;
+
+    var bounds = {};
+    ['Low', 'High'].forEach(function (key) {
+      var labor = round2(result['labor' + key] * scale);
+      var combo = round2(labor * result.comboDiscountRate);
+      var net = round2(labor - combo);
+      var supplies = Math.min(cap, round2(net * Engine.SHOP_INFO.shopSuppliesRate));
+      var preCoupon = round2(result['parts' + key] + net + supplies);
+      var subtotal = Math.max(0, round2(preCoupon - result['couponDiscount' + key]));
+      var hst = round2(subtotal * Engine.SHOP_INFO.hstRate);
+      bounds[key] = {
+        labor: labor,
+        combo: combo,
+        supplies: supplies,
+        subtotal: subtotal,
+        hst: hst,
+        total: round2(subtotal + hst)
+      };
+    });
+
+    var adjusted = {};
+    for (var prop in result) {
+      if (Object.prototype.hasOwnProperty.call(result, prop)) adjusted[prop] = result[prop];
+    }
+    adjusted.laborLow = bounds.Low.labor;
+    adjusted.laborHigh = bounds.High.labor;
+    adjusted.comboDiscountLow = bounds.Low.combo;
+    adjusted.comboDiscountHigh = bounds.High.combo;
+    adjusted.shopSuppliesLow = bounds.Low.supplies;
+    adjusted.shopSuppliesHigh = bounds.High.supplies;
+    adjusted.subtotalLow = bounds.Low.subtotal;
+    adjusted.subtotalHigh = bounds.High.subtotal;
+    adjusted.hstLow = bounds.Low.hst;
+    adjusted.hstHigh = bounds.High.hst;
+    adjusted.totalLow = bounds.Low.total;
+    adjusted.totalHigh = bounds.High.total;
+    adjusted.lineItems = result.lineItems.map(function (li) {
+      var copy = {};
+      for (var p in li) {
+        if (Object.prototype.hasOwnProperty.call(li, p)) copy[p] = li[p];
+      }
+      copy.laborLow = round2(li.laborLow * scale);
+      copy.laborHigh = round2(li.laborHigh * scale);
+      return copy;
+    });
+    return adjusted;
+  }
+
+  function renderAnnouncementBanner() {
+    var text = (state.ownerConfig && state.ownerConfig.bannerText) ||
+      Engine.TIER_CONFIG_DEFAULTS.bannerText;
+    document.getElementById('announcement-banner-text').textContent = text;
+  }
+
+  /* --- Seasonal tire & rim size calculator ------------------------- */
+
+  function bindTireCalculator() {
+    var results = document.getElementById('tire-comparison-results');
+
+    function signed(value, unit) {
+      var sign = value > 0 ? '+' : '';
+      return sign + value + (unit || '');
+    }
+
+    function metricCard(label, valueText, deltaText) {
+      var card = document.createElement('div');
+      card.className = 'tire-metric-card';
+      var labelEl = document.createElement('p');
+      labelEl.className = 'tire-metric-label';
+      labelEl.textContent = label;
+      var valueEl = document.createElement('p');
+      valueEl.className = 'tire-metric-value';
+      valueEl.textContent = valueText;
+      card.appendChild(labelEl);
+      card.appendChild(valueEl);
+      if (deltaText) {
+        var deltaEl = document.createElement('p');
+        deltaEl.className = 'tire-metric-delta';
+        deltaEl.textContent = deltaText;
+        card.appendChild(deltaEl);
+      }
+      return card;
+    }
+
+    function runComparison() {
+      var currentVal = document.getElementById('tire-input-current').value;
+      var targetVal = document.getElementById('tire-input-target').value;
+      var current = Engine.parseTireSize(currentVal);
+      var target = Engine.parseTireSize(targetVal);
+      var comparison = Engine.compareTireSizes(currentVal, targetVal);
+      var badge = document.getElementById('tire-fitment-badge');
+      results.innerHTML = '';
+
+      if (!current || !target || !comparison) {
+        var hint = document.createElement('p');
+        hint.className = 'tire-format-hint';
+        hint.textContent = 'Please enter standard metric sizes like 205/55R16, 225/45R17, or P215/60R16.';
+        results.appendChild(hint);
+        badge.className = 'fitment-badge';
+        badge.textContent = 'ENTER VALID TIRE SIZES';
+        document.getElementById('tire-speedo-diff').textContent = 'Speedometer at 100 km/h: —';
+        return;
+      }
+
+      results.appendChild(metricCard('Section Width',
+        current.width + ' mm → ' + target.width + ' mm',
+        signed(target.width - current.width, ' mm')));
+      results.appendChild(metricCard('Overall Diameter',
+        current.overallDiameterMm + ' mm → ' + target.overallDiameterMm + ' mm',
+        signed(comparison.diameterDiffMm, ' mm') + ' (' + signed(comparison.diameterDiffPercent, '%') + ')'));
+      results.appendChild(metricCard('Sidewall Height',
+        current.sidewallHeightMm + ' mm → ' + target.sidewallHeightMm + ' mm',
+        signed(comparison.sidewallDiffMm, ' mm')));
+      results.appendChild(metricCard('Circumference',
+        current.circumferenceMm + ' mm → ' + target.circumferenceMm + ' mm',
+        signed(comparison.circumferenceDiffMm, ' mm')));
+
+      var speedoMessage = 'Speedometer reads ' + comparison.speedometerReadingAt100 +
+        ' km/h when traveling 100 km/h';
+      if (comparison.diameterDiffPercent > 0) {
+        speedoMessage += ' (actual speed is faster)';
+      } else if (comparison.diameterDiffPercent < 0) {
+        speedoMessage += ' (actual speed is slower)';
+      }
+      document.getElementById('tire-speedo-diff').textContent = speedoMessage;
+
+      if (comparison.complianceRating === 'safe') {
+        badge.className = 'fitment-badge is-safe';
+        badge.textContent = 'OEM FITMENT SAFE (±3.0% GUIDELINE)';
+      } else {
+        badge.className = 'fitment-badge is-caution';
+        badge.textContent = 'FITMENT CAUTION (> 3.0% VARIANCE - SPEEDO / GEARING CALIBRATION REQUIRED)';
+      }
+    }
+
+    document.getElementById('btn-calc-tires').addEventListener('click', runComparison);
+    document.getElementById('tire-input-current').addEventListener('change', runComparison);
+    document.getElementById('tire-input-target').addEventListener('change', runComparison);
+    runComparison();
+  }
+
+  /* --- Printable voucher modal -------------------------------------- */
+
+  function bindVoucherModal() {
+    var modal = document.getElementById('voucher-modal');
+
+    function openVoucherModal() {
+      if (state.selectedServiceIds.length === 0) {
+        window.alert('Please select at least one service before printing your estimate voucher.');
+        return;
+      }
+      if (!lastEstimate) lastEstimate = recalculateAndRenderEstimate();
+      var voucher = Engine.generateVoucherData(lastEstimate, bookingPayload());
+
+      document.getElementById('voucher-code-display').textContent = voucher.voucherCode;
+      document.getElementById('voucher-expiry-date').textContent = voucher.expiryDate +
+        ' (' + voucher.validDays + '-day rolling validity)';
+
+      var tbody = document.getElementById('voucher-line-items');
+      tbody.innerHTML = '';
+      var intro = document.createElement('tr');
+      var introCell = document.createElement('td');
+      introCell.setAttribute('colspan', '3');
+      introCell.textContent = 'Customer: ' + voucher.customerName +
+        ' — Vehicle: ' + voucher.vehicleSummary +
+        (voucher.couponCode ? ' — Coupon: ' + voucher.couponCode : '');
+      intro.appendChild(introCell);
+      tbody.appendChild(intro);
+      voucher.lineItems.forEach(function (item) {
+        var row = document.createElement('tr');
+        var name = document.createElement('td');
+        name.textContent = item.name;
+        var parts = document.createElement('td');
+        parts.textContent = fmtRange(item.partsLow, item.partsHigh);
+        var labor = document.createElement('td');
+        labor.textContent = fmtRange(item.laborLow, item.laborHigh);
+        row.appendChild(name);
+        row.appendChild(parts);
+        row.appendChild(labor);
+        tbody.appendChild(row);
+      });
+
+      document.getElementById('voucher-supplies').textContent = fmtCAD(voucher.shopSuppliesFee);
+      document.getElementById('voucher-subtotal').textContent = fmtRange(voucher.subtotalLow, voucher.subtotalHigh);
+      document.getElementById('voucher-hst').textContent = fmtRange(voucher.hstLow, voucher.hstHigh);
+      document.getElementById('voucher-total').textContent = fmtRange(voucher.totalLow, voucher.totalHigh) +
+        ' (13% Ontario HST included)';
+      document.getElementById('voucher-print-area').setAttribute('data-voucher-code', voucher.voucherCode);
+
+      modal.hidden = false;
+      modal.classList.add('active');
+    }
+
+    document.getElementById('btn-print-estimate').addEventListener('click', openVoucherModal);
+    document.getElementById('btn-close-voucher').addEventListener('click', function () {
+      modal.hidden = true;
+      modal.classList.remove('active');
+    });
+    document.getElementById('btn-print-voucher').addEventListener('click', function () {
+      if (typeof window !== 'undefined' && typeof window.print === 'function') {
+        window.print();
+      }
+    });
+  }
+
+  /* --- Shop owner config drawer ------------------------------------- */
+
+  function setOwnerFeedback(message, kind) {
+    var box = document.getElementById('owner-status-feedback');
+    box.textContent = message;
+    box.className = 'owner-status-feedback ' + (kind || '');
+  }
+
+  function downloadCsv(csv) {
+    try {
+      if (typeof window.Blob === 'function' && typeof window.URL !== 'undefined' &&
+          typeof window.URL.createObjectURL === 'function') {
+        var blob = new window.Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var url = window.URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = 'revolutions_automotive_bookings.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        return true;
+      }
+    } catch (err) {
+      /* download unsupported in this environment - CSV stays in memory */
+    }
+    return false;
+  }
+
+  function bindOwnerDrawer() {
+    if (!state.ownerConfig) {
+      state.ownerConfig = {
+        unlocked: false,
+        laborRatePerHour: 130.00,
+        shopSuppliesCap: 35.00,
+        bannerText: '',
+        customPin: ''
+      };
+    }
+    if (!state.ownerConfig.bannerText) {
+      state.ownerConfig.bannerText = Engine.TIER_CONFIG_DEFAULTS.bannerText;
+    }
+    if (!state.ownerConfig.customPin) {
+      state.ownerConfig.customPin = Engine.TIER_CONFIG_DEFAULTS.defaultOwnerPin;
+    }
+
+    renderAnnouncementBanner();
+    document.getElementById('owner-labor-rate-input').value = String(state.ownerConfig.laborRatePerHour);
+    document.getElementById('owner-supplies-cap-input').value = String(state.ownerConfig.shopSuppliesCap);
+    document.getElementById('owner-banner-text-input').value = state.ownerConfig.bannerText;
+
+    if (state.ownerConfig.unlocked) {
+      document.getElementById('owner-panel-content').hidden = false;
+      document.getElementById('owner-pin-input').hidden = true;
+    }
+
+    var drawer = document.getElementById('owner-drawer');
+    var toggle = document.getElementById('owner-drawer-toggle');
+    toggle.addEventListener('click', function () {
+      var opening = drawer.hidden;
+      drawer.hidden = !opening;
+      toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    });
+
+    document.getElementById('btn-owner-unlock').addEventListener('click', function () {
+      var entered = document.getElementById('owner-pin-input').value;
+      if (Engine.validateOwnerPin(entered, state.ownerConfig.customPin)) {
+        state.ownerConfig.unlocked = true;
+        saveState();
+        document.getElementById('owner-panel-content').hidden = false;
+        document.getElementById('owner-pin-input').hidden = true;
+        setOwnerFeedback('Admin Unlocked', 'is-success');
+      } else {
+        setOwnerFeedback('Invalid PIN. Contact shop administrator.', 'is-error');
+      }
+    });
+
+    document.getElementById('btn-owner-save').addEventListener('click', function () {
+      var rate = Number(document.getElementById('owner-labor-rate-input').value);
+      var cap = Number(document.getElementById('owner-supplies-cap-input').value);
+      var banner = document.getElementById('owner-banner-text-input').value.trim();
+
+      if (!(rate > 0)) {
+        setOwnerFeedback('Labor rate must be greater than $0.00 CAD/hr.', 'is-error');
+        return;
+      }
+      if (!(cap >= 0)) {
+        setOwnerFeedback('Shop supplies cap must be $0.00 CAD or more.', 'is-error');
+        return;
+      }
+
+      state.ownerConfig.laborRatePerHour = round2(rate);
+      state.ownerConfig.shopSuppliesCap = round2(cap);
+      if (banner) state.ownerConfig.bannerText = banner;
+      saveState();
+      renderAnnouncementBanner();
+      recalculateAndRenderEstimate();
+      setOwnerFeedback('Configuration saved. Live estimates and announcement banner updated.', 'is-success');
+    });
+
+    document.getElementById('btn-owner-export-csv').addEventListener('click', function () {
+      var records = [];
+      if (state.lastConfirmedBooking) records.push(state.lastConfirmedBooking);
+      records = records.concat(state.workOrders || []).concat(Engine.SEED_WORK_ORDERS);
+      var csv = Engine.exportBookingsToCsv(records);
+      var downloaded = downloadCsv(csv);
+      setOwnerFeedback(
+        'Bookings export ready: revolutions_automotive_bookings.csv (' + records.length +
+        ' records)' + (downloaded ? ' - download started.' : ''),
+        'is-success'
+      );
+    });
+  }
+
   function renderAll() {
     renderSymptomChips();
     renderSymptomRecommendations();
@@ -1009,6 +1358,9 @@
     bindWizard();
     bindSafetyPreCheck();
     bindBayTracker();
+    bindTireCalculator();
+    bindVoucherModal();
+    bindOwnerDrawer();
     syncVehicleAndCouponInputs();
     syncBookingInputs();
     renderAll();

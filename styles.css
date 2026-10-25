@@ -980,3 +980,444 @@ input:focus, select:focus, button:focus-visible {
   .tl-step { text-align: left; padding: 0.55rem 0.7rem 0.55rem 2.4rem; }
   .tl-step::before { top: 50%; left: 0.85rem; transform: translateY(-50%); }
 }
+
+/* ------------------------------------------------------------------ */
+/* Phase 3: Announcement banner, tire calculator, voucher modal,      */
+/* owner config drawer and print stylesheet                          */
+/* ------------------------------------------------------------------ */
+
+.announcement-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem 1rem;
+  padding: 0.55rem 1.25rem;
+  background: linear-gradient(90deg, var(--crimson-dark), var(--crimson));
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-align: center;
+}
+
+.announcement-banner .banner-flag {
+  background: var(--gold-bright);
+  color: #1a1205;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 0.15rem 0.55rem;
+  border-radius: 4px;
+}
+
+/* Tire & rim size calculator --------------------------------------- */
+
+.tire-calc-panel {
+  background: var(--bg-800);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.4rem 1.5rem;
+  display: grid;
+  gap: 1.2rem;
+}
+
+.tire-calc-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.tire-field { display: grid; gap: 0.35rem; }
+
+.tire-field label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+
+.tire-field input {
+  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 1rem;
+  letter-spacing: 1px;
+}
+
+.tire-field input:focus {
+  outline: 2px solid var(--gold);
+  border-color: var(--gold);
+}
+
+.tire-comparison-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.9rem;
+}
+
+.tire-comparison-results:empty { display: none; }
+
+.tire-metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.tire-metric-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin: 0 0 0.25rem;
+}
+
+.tire-metric-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.tire-metric-delta {
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin: 0.2rem 0 0;
+  color: var(--gold-bright);
+}
+
+.tire-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.tire-speedo-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fitment-badge {
+  display: inline-block;
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.fitment-badge.is-safe {
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid var(--emerald);
+  color: #6ee7b7;
+}
+
+.fitment-badge.is-caution {
+  background: rgba(220, 38, 38, 0.18);
+  border: 1px solid var(--crimson);
+  color: #fca5a5;
+  animation: bay-pulse 1.8s ease-in-out infinite;
+}
+
+/* Printable voucher modal ------------------------------------------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(8, 10, 14, 0.78);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+}
+
+.modal-overlay[hidden] { display: none; }
+
+.voucher-modal-frame {
+  width: min(820px, 100%);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.voucher-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  justify-content: flex-end;
+}
+
+.voucher-sheet {
+  background: #fff;
+  color: #111;
+  border-radius: var(--radius);
+  padding: 1.6rem 1.8rem;
+  box-shadow: var(--shadow);
+  border: 2px solid #111;
+}
+
+.voucher-sheet-head .voucher-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  border-bottom: 3px double #111;
+  padding-bottom: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.voucher-sheet .brand-mark {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.voucher-code-line,
+.voucher-expiry-line {
+  margin: 0.25rem 0;
+  font-size: 0.95rem;
+}
+
+.voucher-code {
+  font-weight: 800;
+  letter-spacing: 2px;
+  border: 2px dashed #111;
+  padding: 0.15rem 0.7rem;
+}
+
+.voucher-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.9rem 0;
+  font-size: 0.9rem;
+}
+
+.voucher-table th,
+.voucher-table td {
+  border: 1px solid #444;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+.voucher-table thead th {
+  background: #eee;
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  letter-spacing: 0.8px;
+}
+
+.voucher-totals { margin: 0; }
+
+.voucher-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px dotted #666;
+  padding: 0.3rem 0;
+  margin: 0;
+}
+
+.voucher-totals dt { font-weight: 600; }
+.voucher-totals dd { margin: 0; font-weight: 700; }
+
+.voucher-totals .voucher-total-row {
+  border-top: 3px double #111;
+  border-bottom: none;
+  margin-top: 0.4rem;
+  padding-top: 0.5rem;
+  font-size: 1.05rem;
+}
+
+.voucher-disclaimer {
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: #333;
+  border-top: 1px solid #999;
+  margin: 1rem 0 0;
+  padding-top: 0.6rem;
+}
+
+/* Owner config drawer ----------------------------------------------- */
+
+.owner-drawer-toggle {
+  margin: 1rem auto 0;
+  display: block;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 0.4rem 1.2rem;
+  cursor: pointer;
+}
+
+.owner-drawer-toggle:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+}
+
+.owner-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 100;
+  height: 100vh;
+  width: min(400px, 92vw);
+  background: var(--bg-800);
+  border-left: 3px solid var(--crimson);
+  box-shadow: var(--shadow);
+  padding: 1.4rem 1.4rem 2rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 1.1rem;
+  align-content: start;
+}
+
+.owner-drawer[hidden] { display: none; }
+
+.owner-drawer-title { font-size: 1.05rem; }
+
+.owner-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0.15rem 0 0.7rem;
+}
+
+.owner-auth { display: grid; gap: 0.5rem; }
+
+.owner-auth label,
+.owner-field label {
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--text-muted);
+}
+
+#owner-pin-input,
+.owner-field input {
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 1rem;
+}
+
+#owner-pin-input {
+  letter-spacing: 6px;
+  text-align: center;
+  border-color: var(--gold);
+  max-width: 220px;
+}
+
+.owner-panel-content { display: grid; gap: 1rem; }
+
+.owner-panel-content[hidden] { display: none; }
+
+.owner-field { display: grid; gap: 0.35rem; }
+
+.owner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.owner-status-feedback {
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-height: 1.3rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.owner-status-feedback:empty { display: none; }
+
+/* Print stylesheet --------------------------------------------------- */
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .site-header,
+  .quick-nav,
+  .announcement-banner,
+  .hero,
+  #symptom-section,
+  #wizard-section,
+  #safety-precheck-section,
+  #catalog-section,
+  #coupon-section,
+  #estimate-workspace,
+  #bay-tracker-section,
+  #tire-calc-section,
+  #safety-showcase,
+  .site-footer,
+  .owner-drawer-toggle,
+  #owner-drawer,
+  .voucher-modal-actions,
+  .modal-overlay .btn {
+    display: none !important;
+  }
+
+  #voucher-modal {
+    position: static;
+    display: block;
+    background: none;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .voucher-modal-frame {
+    width: 100%;
+    max-width: none;
+  }
+
+  #voucher-print-area {
+    width: 100%;
+    max-width: none;
+    border: 2px solid #000;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0.5in;
+    background: #fff;
+    color: #000;
+  }
+
+  #voucher-print-area .voucher-brand { border-bottom: 3px double #000; }
+
+  .voucher-table th,
+  .voucher-table td { border: 1px solid #000; }
+
+  .voucher-table thead th { background: #f2f2f2; color: #000; }
+
+  .voucher-code { border: 2px dashed #000; color: #000; }
+
+  .voucher-totals .voucher-total-row { border-top: 3px double #000; }
+
+  .voucher-disclaimer { color: #000; border-top: 1px solid #000; }
+}

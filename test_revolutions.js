@@ -1670,6 +1670,664 @@ test('simulation: the booking-to-tracker pool coexists with the seed work orders
   assert.notStrictEqual(workOrder.code, 'REV-4092');
 });
 
+/* ================================================================== */
+/* Phase 3 - Segment 1: Engine extensions                              */
+/* ================================================================== */
+
+group('Phase 3 - Segment 1 Engine Tests');
+
+var CSV_HEADER_LINE = 'Work Order Code,Customer Name,Phone,Vehicle Year,Vehicle Make,Vehicle Model,Origin,Class,Date,Time,Mode,Status,Total Low,Total High,Services';
+
+test('TIER_CONFIG_DEFAULTS is deep-frozen with the Brampton shop defaults', function () {
+  assert.ok(Object.isFrozen(Engine.TIER_CONFIG_DEFAULTS), 'the tier config root must be frozen');
+  assert.ok(Object.isFrozen(Engine.TIER_CONFIG_DEFAULTS.activeCoupons), 'activeCoupons must be frozen');
+  assert.strictEqual(Engine.TIER_CONFIG_DEFAULTS.laborRatePerHour, 130.00);
+  assert.strictEqual(Engine.TIER_CONFIG_DEFAULTS.shopSuppliesRate, 0.05);
+  assert.strictEqual(Engine.TIER_CONFIG_DEFAULTS.shopSuppliesCap, 35.00);
+  assert.strictEqual(Engine.TIER_CONFIG_DEFAULTS.defaultOwnerPin, '8351');
+  assert.strictEqual(Engine.TIER_CONFIG_DEFAULTS.currency, 'CAD');
+  assert.strictEqual(Engine.TIER_CONFIG_DEFAULTS.hstRate, 0.13);
+  assert.strictEqual(typeof Engine.TIER_CONFIG_DEFAULTS.bannerText, 'string');
+  assert.ok(Engine.TIER_CONFIG_DEFAULTS.bannerText.length > 0);
+});
+
+test('TIER_CONFIG_DEFAULTS.activeCoupons mirrors the live coupon catalog', function () {
+  assert.strictEqual(Engine.TIER_CONFIG_DEFAULTS.activeCoupons.length, 5);
+  assert.deepStrictEqual(Engine.TIER_CONFIG_DEFAULTS.activeCoupons,
+    Engine.COUPON_CATALOG.map(function (c) { return c.code; }));
+});
+
+test('SEO_SCHEMA_DATA is a frozen Schema.org AutoRepair object for the Brampton shop', function () {
+  assert.ok(Object.isFrozen(Engine.SEO_SCHEMA_DATA));
+  assert.strictEqual(Engine.SEO_SCHEMA_DATA['@context'], 'https://schema.org');
+  assert.strictEqual(Engine.SEO_SCHEMA_DATA['@type'], 'AutoRepair');
+  assert.strictEqual(Engine.SEO_SCHEMA_DATA.name, 'Revolutions Automotive');
+  assert.strictEqual(Engine.SEO_SCHEMA_DATA.priceRange, '$$');
+});
+
+test('SEO_SCHEMA_DATA carries the full Brampton postal address', function () {
+  var addr = Engine.SEO_SCHEMA_DATA.address;
+  assert.strictEqual(addr.streetAddress, '1-15A Fisherman Dr');
+  assert.strictEqual(addr.addressLocality, 'Brampton');
+  assert.strictEqual(addr.addressRegion, 'ON');
+  assert.strictEqual(addr.postalCode, 'L7A 1B7');
+  assert.strictEqual(addr.addressCountry, 'CA');
+});
+
+test('SEO_SCHEMA_DATA geo-coordinates match the Brampton location', function () {
+  assert.strictEqual(Engine.SEO_SCHEMA_DATA.geo.latitude, 43.7196);
+  assert.strictEqual(Engine.SEO_SCHEMA_DATA.geo.longitude, -79.7946);
+});
+
+test('SEO_SCHEMA_DATA exposes the shop phone and opening hours', function () {
+  assert.strictEqual(Engine.SEO_SCHEMA_DATA.telephone, '+1-905-846-8351');
+  var specs = Engine.SEO_SCHEMA_DATA.openingHoursSpecification;
+  assert.strictEqual(specs.length, 2);
+  assert.deepStrictEqual(specs[0].dayOfWeek, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
+  assert.strictEqual(specs[0].opens, '08:00');
+  assert.strictEqual(specs[0].closes, '18:00');
+  assert.deepStrictEqual(specs[1].dayOfWeek, ['Saturday']);
+  assert.strictEqual(specs[1].opens, '08:30');
+  assert.strictEqual(specs[1].closes, '15:00');
+  assert.ok(Engine.SEO_SCHEMA_DATA.openingHours.indexOf('Mo-Fr 08:00-18:00') !== -1);
+});
+
+test('SEO_SCHEMA_DATA offer catalog lists all 12 services', function () {
+  var offers = Engine.SEO_SCHEMA_DATA.hasOfferCatalog.itemListElement;
+  assert.strictEqual(offers.length, Engine.SERVICE_CATALOG.length);
+  assert.strictEqual(offers.length, 12);
+  var names = offers.map(function (o) { return o.itemOffered.name; });
+  Engine.SERVICE_CATALOG.forEach(function (svc) {
+    assert.ok(names.indexOf(svc.name) !== -1, 'catalog must expose ' + svc.name);
+  });
+});
+
+test('parseTireSize computes the full metric math for 205/55R16', function () {
+  var t = Engine.parseTireSize('205/55R16');
+  assert.strictEqual(t.width, 205);
+  assert.strictEqual(t.aspectRatio, 55);
+  assert.strictEqual(t.rimDiameter, 16);
+  assert.strictEqual(t.normalized, '205/55R16');
+  assert.strictEqual(t.sidewallHeightMm, 112.75);
+  assert.strictEqual(t.overallDiameterMm, 631.9);
+  assert.strictEqual(t.overallDiameterInches, 24.88);
+  assert.strictEqual(t.circumferenceMm, round2(Math.PI * 631.9));
+});
+
+test('parseTireSize computes 225/45R17 sizing', function () {
+  var t = Engine.parseTireSize('225/45R17');
+  assert.strictEqual(t.width, 225);
+  assert.strictEqual(t.rimDiameter, 17);
+  assert.strictEqual(t.sidewallHeightMm, 101.25);
+  assert.strictEqual(t.overallDiameterMm, 634.3);
+});
+
+test('parseTireSize accepts P/LT prefixes and the 215/60/16 slash notation', function () {
+  var p = Engine.parseTireSize('P215/60R16');
+  assert.strictEqual(p.normalized, '215/60R16');
+  assert.strictEqual(p.width, 215);
+  var lt = Engine.parseTireSize('LT275/65R18');
+  assert.strictEqual(lt.width, 275);
+  assert.strictEqual(lt.aspectRatio, 65);
+  assert.strictEqual(lt.rimDiameter, 18);
+  var slash = Engine.parseTireSize('215/60/16');
+  assert.strictEqual(slash.normalized, p.normalized);
+  assert.strictEqual(slash.overallDiameterMm, p.overallDiameterMm);
+});
+
+test('parseTireSize returns null for malformed inputs', function () {
+  assert.strictEqual(Engine.parseTireSize('abc'), null);
+  assert.strictEqual(Engine.parseTireSize('205-55-16'), null);
+  assert.strictEqual(Engine.parseTireSize(''), null);
+  assert.strictEqual(Engine.parseTireSize(null), null);
+  assert.strictEqual(Engine.parseTireSize(205), null);
+  assert.strictEqual(Engine.parseTireSize('205/55R'), null);
+});
+
+test('parseTireSize returns null for out-of-range dimensions', function () {
+  assert.strictEqual(Engine.parseTireSize('120/55R16'), null);
+  assert.strictEqual(Engine.parseTireSize('410/55R16'), null);
+  assert.strictEqual(Engine.parseTireSize('205/15R16'), null);
+  assert.strictEqual(Engine.parseTireSize('205/110R16'), null);
+  assert.strictEqual(Engine.parseTireSize('205/55R9'), null);
+});
+
+test('compareTireSizes reports zero variance for identical sizes', function () {
+  var r = Engine.compareTireSizes('205/55R16', '205/55R16');
+  assert.strictEqual(r.diameterDiffMm, 0);
+  assert.strictEqual(r.diameterDiffPercent, 0);
+  assert.strictEqual(r.speedometerReadingAt100, 100);
+  assert.strictEqual(r.speedoDiffKmh, 0);
+  assert.strictEqual(r.complianceRating, 'safe');
+  assert.strictEqual(r.isWithinTolerance, true);
+});
+
+test('compareTireSizes rates a mild 225/45R17 upsize as safe', function () {
+  var r = Engine.compareTireSizes('205/55R16', '225/45R17');
+  assert.strictEqual(r.diameterDiffMm, 2.4);
+  assert.strictEqual(r.diameterDiffPercent, 0.38);
+  assert.strictEqual(r.sidewallDiffMm, -11.5);
+  assert.strictEqual(r.complianceRating, 'safe');
+  assert.strictEqual(r.isWithinTolerance, true);
+  assert.ok(r.speedometerReadingAt100 > 99 && r.speedometerReadingAt100 < 100,
+    'a taller target tire must make the speedometer read below 100 km/h');
+  assert.strictEqual(r.circumferenceDiffMm, round2(r.target.circumferenceMm - r.current.circumferenceMm));
+});
+
+test('compareTireSizes rates an aggressive 275/65R18 upsize as caution', function () {
+  var r = Engine.compareTireSizes('205/55R16', '275/65R18');
+  assert.strictEqual(r.diameterDiffMm, 182.8);
+  assert.strictEqual(r.diameterDiffPercent, 28.93);
+  assert.strictEqual(r.complianceRating, 'caution');
+  assert.strictEqual(r.isWithinTolerance, false);
+  assert.ok(r.speedometerReadingAt100 > 77 && r.speedometerReadingAt100 < 78);
+  assert.ok(r.recommendation.indexOf('3.0%') !== -1);
+});
+
+test('compareTireSizes returns null when either size is invalid', function () {
+  assert.strictEqual(Engine.compareTireSizes('205/55R16', 'not-a-size'), null);
+  assert.strictEqual(Engine.compareTireSizes('nope', '205/55R16'), null);
+  assert.strictEqual(Engine.compareTireSizes('', ''), null);
+});
+
+var VOUCHER_BOOKING = {
+  customerName: 'Dana Osei',
+  phone: '905-555-0147',
+  vehicleYear: 2022,
+  vehicleMake: 'Honda',
+  vehicleModel: 'Civic',
+  vehicleClass: 'sedan',
+  preferredDate: '2026-05-01',
+  preferredTime: '10:00'
+};
+var VOUCHER_ESTIMATE_OPTIONS = {
+  serviceIds: ['tir_mount_balance', 'tir_align_4whl'],
+  vehicleOrigin: 'domestic',
+  vehicleClass: 'sedan'
+};
+
+test('generateVoucherData produces a deterministic REV-VOUCH-XXXX code', function () {
+  var a = Engine.generateVoucherData(VOUCHER_ESTIMATE_OPTIONS, VOUCHER_BOOKING);
+  var b = Engine.generateVoucherData(VOUCHER_ESTIMATE_OPTIONS, VOUCHER_BOOKING);
+  assert.ok(/^REV-VOUCH-[0-9A-Z]{4}$/.test(a.voucherCode), 'voucher code format: ' + a.voucherCode);
+  assert.strictEqual(a.voucherCode, b.voucherCode, 'identical payloads must produce identical codes');
+});
+
+test('generateVoucherData computes a rolling 30-day expiry in UTC', function () {
+  var v = Engine.generateVoucherData(VOUCHER_ESTIMATE_OPTIONS, VOUCHER_BOOKING);
+  assert.strictEqual(v.issuedDate, '2026-05-01');
+  assert.strictEqual(v.expiryDate, '2026-05-31');
+  assert.strictEqual(v.validDays, 30);
+  var v2 = Engine.generateVoucherData(VOUCHER_ESTIMATE_OPTIONS, { preferredDate: '2026-12-01' });
+  assert.strictEqual(v2.issuedDate, '2026-12-01');
+  assert.strictEqual(v2.expiryDate, '2026-12-31');
+});
+
+test('generateVoucherData itemizes pricing straight from the estimator', function () {
+  var calc = Engine.calculateEstimate(VOUCHER_ESTIMATE_OPTIONS);
+  var v = Engine.generateVoucherData(VOUCHER_ESTIMATE_OPTIONS, VOUCHER_BOOKING);
+  assert.strictEqual(v.lineItems.length, calc.lineItems.length);
+  assert.strictEqual(v.subtotalLow, calc.subtotalLow);
+  assert.strictEqual(v.subtotalHigh, calc.subtotalHigh);
+  assert.strictEqual(v.totalLow, calc.totalLow);
+  assert.strictEqual(v.totalHigh, calc.totalHigh);
+  assert.strictEqual(v.couponCode, calc.couponCode);
+});
+
+test('generateVoucherData applies 13% Ontario HST consistently', function () {
+  var v = Engine.generateVoucherData(VOUCHER_ESTIMATE_OPTIONS, VOUCHER_BOOKING);
+  assert.strictEqual(v.hstRate, 0.13);
+  assert.strictEqual(v.hstLow, round2(v.subtotalLow * 0.13));
+  assert.strictEqual(v.hstAmount, v.hstLow);
+  assert.strictEqual(v.totalLow, round2(v.subtotalLow + v.hstLow));
+  assert.strictEqual(v.totalAmount, v.totalLow);
+  assert.strictEqual(v.currency, 'CAD');
+});
+
+test('generateVoucherData carries shop, customer, vehicle and disclaimer text', function () {
+  var v = Engine.generateVoucherData(VOUCHER_ESTIMATE_OPTIONS, VOUCHER_BOOKING);
+  assert.strictEqual(v.customerName, 'Dana Osei');
+  assert.strictEqual(v.customerPhone, '905-555-0147');
+  assert.strictEqual(v.vehicleSummary, '2022 Honda Civic (sedan)');
+  assert.strictEqual(v.shopInfo, Engine.SHOP_INFO);
+  assert.ok(v.disclaimer.indexOf('Revolutions Automotive') !== -1);
+  assert.ok(v.disclaimer.indexOf('30 days') !== -1);
+});
+
+test('exportBookingsToCsv returns just the CRLF header for empty or invalid input', function () {
+  var headerCsv = CSV_HEADER_LINE + '\r\n';
+  assert.strictEqual(Engine.exportBookingsToCsv([]), headerCsv);
+  assert.strictEqual(Engine.exportBookingsToCsv(null), headerCsv);
+  assert.strictEqual(Engine.exportBookingsToCsv('nope'), headerCsv);
+});
+
+test('exportBookingsToCsv renders a standard booking row', function () {
+  var csv = Engine.exportBookingsToCsv([{
+    code: 'REV-2048',
+    customerName: 'Jordan Fields',
+    phone: '905-555-0123',
+    vehicleYear: 2022,
+    vehicleMake: 'Honda',
+    vehicleModel: 'Civic',
+    origin: 'import',
+    vehicleClass: 'sedan',
+    preferredDate: '2026-06-01',
+    preferredTime: '10:00',
+    bookingMode: 'drop_off',
+    currentState: 'IN_REPAIR_BAY',
+    estimatedTotal: 142.9,
+    serviceIds: ['tir_mount_balance', 'tir_align_4whl']
+  }]);
+  var expectedRow = ['REV-2048', 'Jordan Fields', '905-555-0123', '2022', 'Honda', 'Civic',
+    'import', 'sedan', '2026-06-01', '10:00', 'drop_off', 'IN_REPAIR_BAY',
+    '142.90', '142.90', 'tir_mount_balance; tir_align_4whl'].join(',');
+  assert.strictEqual(csv, CSV_HEADER_LINE + '\r\n' + expectedRow + '\r\n');
+});
+
+test('exportBookingsToCsv wraps fields containing commas in RFC-4180 quotes', function () {
+  var csv = Engine.exportBookingsToCsv([{
+    code: 'REV-3105',
+    customerName: 'Fields, Jordan',
+    phone: '905-555-0188',
+    serviceIds: ['Brake Service', 'Alignment, Road Test']
+  }]);
+  var expectedRow = ['REV-3105', '"Fields, Jordan"', '905-555-0188', '', '', '', '', '', '', '', '',
+    'BOOKED', '', '', '"Brake Service; Alignment, Road Test"'].join(',');
+  assert.strictEqual(csv, CSV_HEADER_LINE + '\r\n' + expectedRow + '\r\n');
+});
+
+test('exportBookingsToCsv doubles embedded quotes and preserves newlines inside quotes', function () {
+  var csv = Engine.exportBookingsToCsv([{
+    code: 'REV-4092',
+    customerName: 'O"Brien',
+    vehicleModel: 'Civic\nSport'
+  }]);
+  assert.ok(csv.indexOf('"O""Brien"') !== -1);
+  assert.ok(csv.indexOf('"Civic\nSport"') !== -1);
+  var rows = csv.split('\r\n');
+  assert.strictEqual(rows.length, 3);
+});
+
+test('exportBookingsToCsv formats the total range and falls back to estimatedTotal', function () {
+  var csv = Engine.exportBookingsToCsv([
+    { code: 'REV-1000', totalLow: 142.9, totalHigh: 180.1 },
+    { code: 'REV-2000', estimatedTotal: 99.999 }
+  ]);
+  var lines = csv.split('\r\n');
+  assert.strictEqual(lines[1],
+    ['REV-1000', '', '', '', '', '', '', '', '', '', '', 'BOOKED', '142.90', '180.10', ''].join(','));
+  assert.strictEqual(lines[2],
+    ['REV-2000', '', '', '', '', '', '', '', '', '', '', 'BOOKED', '100.00', '100.00', ''].join(','));
+});
+
+test('exportBookingsToCsv exports the seed work orders end-to-end', function () {
+  var csv = Engine.exportBookingsToCsv(Engine.SEED_WORK_ORDERS);
+  var lines = csv.split('\r\n');
+  assert.strictEqual(lines.length, Engine.SEED_WORK_ORDERS.length + 2);
+  assert.strictEqual(lines[1].slice(0, 8), 'REV-2048');
+  assert.strictEqual(lines[2].slice(0, 8), 'REV-3105');
+  assert.strictEqual(lines[3].slice(0, 8), 'REV-4092');
+  assert.ok(lines[3].indexOf('READY_FOR_PICKUP') !== -1);
+});
+
+test('validateOwnerPin accepts the default 8351 PIN in string, numeric and padded forms', function () {
+  assert.strictEqual(Engine.validateOwnerPin('8351'), true);
+  assert.strictEqual(Engine.validateOwnerPin(8351), true);
+  assert.strictEqual(Engine.validateOwnerPin('  8351\n'), true);
+});
+
+test('validateOwnerPin rejects wrong, malformed and missing entries', function () {
+  assert.strictEqual(Engine.validateOwnerPin('0000'), false);
+  assert.strictEqual(Engine.validateOwnerPin('835'), false);
+  assert.strictEqual(Engine.validateOwnerPin('abcd'), false);
+  assert.strictEqual(Engine.validateOwnerPin(null), false);
+  assert.strictEqual(Engine.validateOwnerPin({}), false);
+});
+
+test('validateOwnerPin verifies against a custom configured PIN', function () {
+  assert.strictEqual(Engine.validateOwnerPin('9942', '9942'), true);
+  assert.strictEqual(Engine.validateOwnerPin('8351', '9942'), false);
+  assert.strictEqual(Engine.validateOwnerPin('8351', ''), true);
+});
+
+/* ================================================================== */
+/* Phase 3 - Segment 2: DOM, JSON-LD & print integrity tests          */
+/* ================================================================== */
+
+group('Phase 3 - Segment 2 DOM & Print Integrity Tests');
+
+var PHASE3_REQUIRED_IDS = [
+  'tire-calc-section', 'tire-input-current', 'tire-input-target', 'btn-calc-tires',
+  'tire-comparison-results', 'tire-speedo-diff', 'tire-fitment-badge',
+  'btn-print-estimate', 'voucher-modal', 'voucher-print-area', 'btn-print-voucher',
+  'btn-close-voucher', 'voucher-code-display', 'voucher-expiry-date',
+  'announcement-banner', 'owner-drawer-toggle', 'owner-drawer', 'owner-pin-input',
+  'btn-owner-unlock', 'owner-panel-content', 'owner-labor-rate-input',
+  'owner-supplies-cap-input', 'owner-banner-text-input', 'btn-owner-save',
+  'btn-owner-export-csv', 'owner-status-feedback'
+];
+
+test('index.html contains every required Phase 3 DOM ID verbatim', function () {
+  PHASE3_REQUIRED_IDS.forEach(function (id) {
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+      'index.html is missing required Phase 3 DOM ID: #' + id);
+  });
+  assert.strictEqual(PHASE3_REQUIRED_IDS.length, 26);
+});
+
+test('the print-estimate trigger lives inside the live estimate summary card', function () {
+  var cardAt = INDEX_HTML.indexOf('id="estimate-summary-card"');
+  var btnAt = INDEX_HTML.indexOf('id="btn-print-estimate"');
+  assert.ok(cardAt !== -1 && btnAt !== -1, 'both the card and the trigger must exist');
+  assert.ok(btnAt > cardAt, '#btn-print-estimate must sit inside #estimate-summary-card');
+  var cardEnd = INDEX_HTML.indexOf('</aside>', cardAt);
+  assert.ok(btnAt < cardEnd, '#btn-print-estimate must sit inside the card markup');
+});
+
+test('the JSON-LD SEO script tag exists with the exact type and id', function () {
+  assert.ok(INDEX_HTML.indexOf('<script type="application/ld+json" id="seo-schema-json">') !== -1,
+    'the seo-schema-json ld+json script tag must exist verbatim');
+});
+
+test('the embedded JSON-LD payload parses via JSON.parse without error', function () {
+  var match = /<script type="application\/ld\+json" id="seo-schema-json">([\s\S]*?)<\/script>/.exec(INDEX_HTML);
+  assert.ok(match, 'the JSON-LD script block must be extractable');
+  JSON.parse(match[1]);
+});
+
+test('the JSON-LD payload is the AutoRepair entity for Revolutions Automotive', function () {
+  var payload = JSON.parse(/<script type="application\/ld\+json" id="seo-schema-json">([\s\S]*?)<\/script>/.exec(INDEX_HTML)[1]);
+  assert.strictEqual(payload['@context'], 'https://schema.org');
+  assert.strictEqual(payload['@type'], 'AutoRepair');
+  assert.strictEqual(payload.name, 'Revolutions Automotive');
+  assert.strictEqual(payload.telephone, '+1-905-846-8351');
+  assert.strictEqual(payload.priceRange, '$$');
+});
+
+test('the JSON-LD payload carries the full Brampton postal address', function () {
+  var payload = JSON.parse(/<script type="application\/ld\+json" id="seo-schema-json">([\s\S]*?)<\/script>/.exec(INDEX_HTML)[1]);
+  assert.strictEqual(payload.address['@type'], 'PostalAddress');
+  assert.strictEqual(payload.address.streetAddress, '1-15A Fisherman Dr');
+  assert.strictEqual(payload.address.addressLocality, 'Brampton');
+  assert.strictEqual(payload.address.addressRegion, 'ON');
+  assert.strictEqual(payload.address.postalCode, 'L7A 1B7');
+  assert.strictEqual(payload.address.addressCountry, 'CA');
+});
+
+test('the JSON-LD payload carries the Brampton geo-coordinates and hours', function () {
+  var payload = JSON.parse(/<script type="application\/ld\+json" id="seo-schema-json">([\s\S]*?)<\/script>/.exec(INDEX_HTML)[1]);
+  assert.strictEqual(payload.geo['@type'], 'GeoCoordinates');
+  assert.strictEqual(payload.geo.latitude, 43.7196);
+  assert.strictEqual(payload.geo.longitude, -79.7946);
+  assert.strictEqual(payload.openingHoursSpecification.length, 2);
+  assert.strictEqual(payload.openingHoursSpecification[0].opens, '08:00');
+  assert.strictEqual(payload.openingHoursSpecification[0].closes, '18:00');
+  assert.strictEqual(payload.openingHoursSpecification[1].opens, '08:30');
+  assert.strictEqual(payload.openingHoursSpecification[1].closes, '15:00');
+});
+
+test('the JSON-LD offer catalog lists all 12 engine services', function () {
+  var payload = JSON.parse(/<script type="application\/ld\+json" id="seo-schema-json">([\s\S]*?)<\/script>/.exec(INDEX_HTML)[1]);
+  var offers = payload.hasOfferCatalog.itemListElement;
+  assert.strictEqual(offers.length, 12);
+  var identifiers = offers.map(function (o) { return o.itemOffered.identifier; });
+  Engine.SERVICE_CATALOG.forEach(function (svc) {
+    assert.ok(identifiers.indexOf(svc.id) !== -1, 'JSON-LD catalog must expose ' + svc.id);
+  });
+});
+
+test('the embedded JSON-LD payload matches SEO_SCHEMA_DATA from the engine', function () {
+  var payload = JSON.parse(/<script type="application\/ld\+json" id="seo-schema-json">([\s\S]*?)<\/script>/.exec(INDEX_HTML)[1]);
+  assert.deepStrictEqual(payload.address, Engine.SEO_SCHEMA_DATA.address);
+  assert.deepStrictEqual(payload.geo, Engine.SEO_SCHEMA_DATA.geo);
+  assert.deepStrictEqual(payload.openingHoursSpecification, Engine.SEO_SCHEMA_DATA.openingHoursSpecification);
+  assert.strictEqual(payload.telephone, Engine.SEO_SCHEMA_DATA.telephone);
+});
+
+test('styles.css declares a print media block that isolates the voucher sheet', function () {
+  assert.ok(STYLES_CSS.indexOf('@media print') !== -1, 'styles.css must contain @media print');
+  var printBlock = STYLES_CSS.slice(STYLES_CSS.indexOf('@media print'));
+  assert.ok(printBlock.indexOf('#voucher-print-area') !== -1,
+    'the print block must style #voucher-print-area');
+  assert.ok(printBlock.indexOf('width: 100%') !== -1,
+    'the print block must expand the voucher sheet to full width');
+});
+
+test('the print block hides site chrome, interactive sections and the owner drawer', function () {
+  var printBlock = STYLES_CSS.slice(STYLES_CSS.indexOf('@media print'));
+  ['.site-header', '.quick-nav', '.site-footer', '#owner-drawer', '#tire-calc-section',
+    '#wizard-section', '#safety-precheck-section', '#bay-tracker-section',
+    '.voucher-modal-actions', 'display: none'
+  ].forEach(function (selector) {
+    assert.ok(printBlock.indexOf(selector) !== -1,
+      'the print block must reference ' + selector);
+  });
+});
+
+test('styles.css styles the fitment badge with safe and caution variants', function () {
+  assert.ok(STYLES_CSS.indexOf('.fitment-badge') !== -1);
+  assert.ok(STYLES_CSS.indexOf('.fitment-badge.is-safe') !== -1);
+  assert.ok(STYLES_CSS.indexOf('.fitment-badge.is-caution') !== -1);
+});
+
+test('styles.css styles the slide-out owner config drawer and status feedback', function () {
+  assert.ok(STYLES_CSS.indexOf('.owner-drawer') !== -1);
+  assert.ok(STYLES_CSS.indexOf('.owner-status-feedback') !== -1);
+  assert.ok(STYLES_CSS.indexOf('.announcement-banner') !== -1);
+  assert.ok(STYLES_CSS.indexOf('.tire-calc-panel') !== -1);
+  assert.ok(STYLES_CSS.indexOf('.voucher-sheet') !== -1);
+});
+
+test('the voucher modal and owner drawer are hidden by default', function () {
+  var modalAt = INDEX_HTML.indexOf('id="voucher-modal"');
+  assert.ok(modalAt !== -1);
+  assert.ok(INDEX_HTML.slice(modalAt - 200, modalAt + 200).indexOf('hidden') !== -1,
+    '#voucher-modal must carry the hidden attribute');
+  var drawerAt = INDEX_HTML.indexOf('id="owner-drawer"');
+  assert.ok(drawerAt !== -1);
+  assert.ok(INDEX_HTML.slice(drawerAt - 200, drawerAt + 200).indexOf('hidden') !== -1,
+    '#owner-drawer must carry the hidden attribute');
+  assert.ok(INDEX_HTML.indexOf('id="owner-panel-content"') !== -1 &&
+    INDEX_HTML.slice(INDEX_HTML.indexOf('id="owner-panel-content"') - 100,
+      INDEX_HTML.indexOf('id="owner-panel-content"') + 100).indexOf('hidden') !== -1,
+    '#owner-panel-content must be locked behind the hidden attribute until unlocked');
+});
+
+test('the printable voucher sheet carries shop branding, code and expiry slots', function () {
+  var sheetStart = INDEX_HTML.indexOf('id="voucher-print-area"');
+  var sheet = INDEX_HTML.slice(sheetStart, INDEX_HTML.indexOf('</article>', sheetStart));
+  assert.ok(sheet.indexOf('Revolutions Automotive') !== -1, 'sheet must show the shop name');
+  assert.ok(sheet.indexOf('Brampton') !== -1, 'sheet must show the shop city');
+  assert.ok(sheet.indexOf('(905) 846-8351') !== -1, 'sheet must show the shop phone');
+  assert.ok(sheet.indexOf('id="voucher-code-display"') !== -1);
+  assert.ok(sheet.indexOf('id="voucher-expiry-date"') !== -1);
+  assert.ok(sheet.indexOf('HST (13%)') !== -1, 'sheet must show the Ontario HST line');
+  assert.ok(sheet.indexOf('voucher-disclaimer') !== -1, 'sheet must include the disclaimer block');
+});
+
+test('the owner drawer inputs use secure and correctly defaulted controls', function () {
+  assert.ok(INDEX_HTML.indexOf('type="password" id="owner-pin-input"') !== -1,
+    'the PIN input must be masked');
+  assert.ok(INDEX_HTML.indexOf('id="owner-pin-input" maxlength="8"') !== -1 ||
+    INDEX_HTML.indexOf('maxlength="8" id="owner-pin-input"') !== -1,
+    'the PIN input must cap entry at 8 characters');
+  assert.ok(INDEX_HTML.indexOf('id="owner-labor-rate-input"') !== -1);
+  assert.ok(INDEX_HTML.indexOf('value="130.00"') !== -1, 'labor rate defaults to $130.00');
+  assert.ok(INDEX_HTML.indexOf('value="35.00"') !== -1, 'supplies cap defaults to $35.00');
+  assert.ok(INDEX_HTML.indexOf('id="owner-supplies-cap-input"') !== -1);
+  assert.ok(INDEX_HTML.indexOf('id="owner-banner-text-input"') !== -1);
+});
+
+test('the tire calculator ships OEM defaults and a quick-nav anchor', function () {
+  assert.ok(INDEX_HTML.indexOf('id="tire-input-current"') !== -1 &&
+    INDEX_HTML.indexOf('value="205/55R16"') !== -1, 'current size defaults to 205/55R16');
+  assert.ok(INDEX_HTML.indexOf('id="tire-input-target"') !== -1 &&
+    INDEX_HTML.indexOf('value="225/45R17"') !== -1, 'target size defaults to 225/45R17');
+  assert.ok(INDEX_HTML.indexOf('href="#tire-calc-section"') !== -1,
+    'the quick-nav must anchor the tire calculator section');
+  assert.ok(INDEX_HTML.indexOf('Brampton Drivers: Book Winter Tire Changeovers') !== -1,
+    'the announcement banner must ship its default Brampton message');
+});
+
+/* ================================================================== */
+/* Phase 3 - Segment 3: Controller wiring & anti-drift tests          */
+/* ================================================================== */
+
+group('Phase 3 - Segment 3 Controller & Anti-Drift Tests');
+
+test('anti-drift: every DOM ID referenced in app.js exists verbatim in index.html', function () {
+  var ids = [];
+  var reGetById = /getElementById\(\s*['"]([^'"]+)['"]\s*\)/g;
+  var reQueryId = /querySelector(?:All)?\(\s*['"]#([A-Za-z0-9_-]+)['"]\s*\)/g;
+  var match;
+  while ((match = reGetById.exec(APP_JS)) !== null) ids.push(match[1]);
+  while ((match = reQueryId.exec(APP_JS)) !== null) ids.push(match[1]);
+  assert.ok(ids.length >= 60, 'expected at least 60 DOM references in app.js, found ' + ids.length);
+  ids.forEach(function (id) {
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+      'app.js references missing DOM ID: #' + id);
+  });
+});
+
+test('all 24 interactive Phase 3 DOM IDs are wired inside app.js', function () {
+  [
+    'tire-input-current', 'tire-input-target', 'btn-calc-tires',
+    'tire-comparison-results', 'tire-speedo-diff', 'tire-fitment-badge',
+    'btn-print-estimate', 'voucher-modal', 'voucher-print-area',
+    'voucher-code-display', 'voucher-expiry-date', 'btn-print-voucher',
+    'btn-close-voucher', 'owner-drawer-toggle', 'owner-drawer',
+    'owner-pin-input', 'btn-owner-unlock', 'owner-panel-content',
+    'owner-labor-rate-input', 'owner-supplies-cap-input',
+    'owner-banner-text-input', 'btn-owner-save', 'btn-owner-export-csv',
+    'owner-status-feedback'
+  ].forEach(function (id) {
+    assert.ok(APP_JS.indexOf(id) !== -1, 'app.js must wire #' + id);
+  });
+});
+
+test('app.js integrates the full Phase 3 engine API surface', function () {
+  [
+    'parseTireSize',
+    'compareTireSizes',
+    'generateVoucherData',
+    'exportBookingsToCsv',
+    'validateOwnerPin',
+    'TIER_CONFIG_DEFAULTS',
+    'window.print'
+  ].forEach(function (symbol) {
+    assert.ok(APP_JS.indexOf(symbol) !== -1,
+      'app.js must invoke the engine function ' + symbol);
+  });
+});
+
+test('owner config persists under the canonical state key with CSV download support', function () {
+  [
+    'ownerConfig',
+    'revolutions_automotive_state_v1',
+    'revolutions_automotive_bookings.csv',
+    'window.Blob',
+    'text/csv;charset=utf-8;',
+    'createObjectURL'
+  ].forEach(function (symbol) {
+    assert.ok(APP_JS.indexOf(symbol) !== -1,
+      'app.js must persist/export via ' + symbol);
+  });
+});
+
+test('exportBookingsToCsv emits the 15-column header and RFC-4180 escaping at runtime', function () {
+  var HEADER = 'Work Order Code,Customer Name,Phone,Vehicle Year,Vehicle Make,Vehicle Model,Origin,Class,Date,Time,Mode,Status,Total Low,Total High,Services';
+  var csv = Engine.exportBookingsToCsv([
+    { code: 'REV-9001', customerName: 'Chan, Wei', vehicleModel: 'Civic\nSi', serviceIds: ['tir_mount_balance', 'tir_align_4whl'] },
+    { code: 'REV-9002', customerName: 'O"Brien', totalLow: 12.5, totalHigh: 20 }
+  ]);
+  assert.ok(csv.indexOf(HEADER) === 0, 'CSV must start with the standard 15-column header');
+  assert.ok(csv.indexOf('"Chan, Wei"') !== -1, 'comma fields must be quoted');
+  assert.ok(csv.indexOf('"Civic\nSi"') !== -1, 'multiline fields must stay quoted on one row');
+  assert.ok(csv.indexOf('"O""Brien"') !== -1, 'embedded quotes must be doubled');
+  assert.ok(csv.indexOf('tir_mount_balance; tir_align_4whl') !== -1,
+    'service lists join with semicolons without forced quoting');
+  var lines = csv.split('\r\n');
+  assert.strictEqual(lines.length, 4, 'header + 2 data rows + trailing CRLF');
+  assert.ok(lines[1].indexOf('BOOKED') !== -1, 'missing status defaults to BOOKED');
+});
+
+test('the voucher modal populates every printable slot and guards empty estimates', function () {
+  assert.ok(APP_JS.indexOf('select at least one service') !== -1,
+    'printing without services must alert the customer');
+  [
+    'voucher-code-display', 'voucher-expiry-date', 'voucher-line-items',
+    'voucher-supplies', 'voucher-subtotal', 'voucher-hst', 'voucher-total',
+    'voucher-print-area'
+  ].forEach(function (id) {
+    assert.ok(APP_JS.indexOf(id) !== -1, 'app.js must populate #' + id);
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+      'index.html must define #' + id + ' verbatim');
+  });
+});
+
+test('the native print trigger is guarded and close restores the hidden modal', function () {
+  assert.ok(APP_JS.indexOf('typeof window.print') !== -1,
+    'window.print must be guarded before invocation');
+  assert.ok(APP_JS.indexOf('modal.hidden = true') !== -1,
+    'closing must hide #voucher-modal');
+  assert.ok(APP_JS.indexOf('modal.hidden = false') !== -1,
+    'opening must unhide #voucher-modal');
+});
+
+test('the tire calculator renders safe and caution fitment badges with format hints', function () {
+  [
+    'OEM FITMENT SAFE', 'FITMENT CAUTION', 'is-safe', 'is-caution',
+    'Please enter standard metric sizes like 205/55R16',
+    'Speedometer reads', 'actual speed is faster'
+  ].forEach(function (fragment) {
+    assert.ok(APP_JS.indexOf(fragment) !== -1,
+      'tire calculator must render: ' + fragment);
+  });
+  assert.ok(APP_JS.indexOf("'change', runComparison") !== -1,
+    'tire inputs must recalculate on change');
+});
+
+test('the announcement banner initializes from the tier config defaults', function () {
+  assert.ok(APP_JS.indexOf('announcement-banner-text') !== -1,
+    'app.js must update the banner text slot');
+  assert.ok(APP_JS.indexOf('TIER_CONFIG_DEFAULTS.bannerText') !== -1,
+    'banner fallback must come from the engine tier config');
+  assert.ok(INDEX_HTML.indexOf('id="announcement-banner-text"') !== -1,
+    'index.html must define the banner text slot');
+});
+
+test('the owner drawer toggles with aria state and unlocks via the engine PIN gate', function () {
+  [
+    'aria-expanded', 'owner-drawer-toggle', 'owner-pin-input',
+    'validateOwnerPin', 'Admin Unlocked', 'Invalid PIN. Contact shop administrator.'
+  ].forEach(function (fragment) {
+    assert.ok(APP_JS.indexOf(fragment) !== -1,
+      'owner drawer must implement: ' + fragment);
+  });
+});
+
+test('owner overrides re-run the live estimate and persist on save', function () {
+  [
+    'ownerAdjustedEstimate',
+    'owner-labor-rate-input', 'owner-supplies-cap-input', 'owner-banner-text-input',
+    'recalculateAndRenderEstimate',
+    'Labor rate must be greater than $0.00 CAD/hr.',
+    'Configuration saved. Live estimates and announcement banner updated.'
+  ].forEach(function (fragment) {
+    assert.ok(APP_JS.indexOf(fragment) !== -1,
+      'owner save flow must include: ' + fragment);
+  });
+});
+
+test('the CSV export gathers confirmed bookings, live work orders and seed orders', function () {
+  assert.ok(APP_JS.indexOf('lastConfirmedBooking') !== -1,
+    'export must include the last confirmed booking');
+  assert.ok(APP_JS.indexOf('SEED_WORK_ORDERS') !== -1,
+    'export must include the seed work orders');
+  assert.ok(APP_JS.indexOf('state.workOrders') !== -1,
+    'export must include user-created work orders');
+});
+
 /* ------------------------------------------------------------------ */
 /* report                                                              */
 /* ------------------------------------------------------------------ */

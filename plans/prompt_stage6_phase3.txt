@@ -1,0 +1,94 @@
+# PHASE 3 STAGE 6 AUDIT REQUEST — Revolutions Automotive
+
+## ROLE
+
+You are Gemini 4 Argon, acting as an INDEPENDENT auditor. Conduct a strict code
+and assertion integrity audit of the complete Phase 3 implementation for the
+Revolutions Automotive platform (1-15A Fisherman Dr, Brampton, ON L7A 1B7 |
+(905) 846-8351). The five attached project files are:
+
+1. `revolutions_engine.js` — dual UMD business logic engine
+2. `index.html` — semantic UI shell
+3. `styles.css` — Midas-inspired industrial styles
+4. `app.js` — interactive DOM controller
+5. `test_revolutions.js` — headless Node assert suite
+
+Audit them strictly against the Phase 3 plan in `plans/PHASE3_ROADMAP.md`
+(printable Midas voucher generator, seasonal tire & rim size calculator,
+LocalBusiness JSON-LD SEO schema, and shop owner config drawer).
+
+## AUDIT SCOPE — verify each item and report findings per section
+
+### 1. Assertion Integrity (zero tolerance)
+- Confirm ALL 91 Phase 1 assertions, ALL 57 Phase 2 assertions (27 + 15 + 15)
+  and ALL 47+ Phase 3 assertions (30 + 17 + 12) remain present, byte-intact in
+  intent, unweakened, unskipped, and not loosened. The current gate is
+  207/207 PASSED via `node test_revolutions.js`.
+- Confirm the suite went green only through genuinely ADDITIVE tests
+  (148 -> 178 -> 195 -> 207), never by deleting, broadening, or weakening a
+  prior assertion.
+
+### 2. Metric Tire Geometry Math
+- `parseTireSize`: regex acceptance (P/LT prefixes, 205/55R16 and 215/60/16
+  notations), dimension bounds, sidewall = width x aspect/100, overall
+  diameter = rim x 25.4 + 2 x sidewall, inches conversion, circumference =
+  pi x diameter, null on malformed input.
+- `compareTireSizes`: diameter delta mm and %, sidewall delta, circumference
+  delta, speedometer reading at 100 km/h (current/target circumference ratio),
+  and the +/-3.0% compliance threshold (`safe` vs `caution`), null on invalid.
+
+### 3. Printable Voucher Generator & @media print Isolation
+- `generateVoucherData`: REV-VOUCH-XXXX code format, deterministic code hash,
+  30-day UTC rolling expiry, itemized estimate pricing, 13% HST, disclaimer.
+- `#voucher-modal` / `#voucher-print-area`: all slots populated
+  (`#voucher-code-display`, `#voucher-expiry-date`, `#voucher-line-items`,
+  `#voucher-supplies`, `#voucher-subtotal`, `#voucher-hst`, `#voucher-total`),
+  empty-estimate guard, guarded `window.print()` call.
+- `styles.css` `@media print` block: hides header/nav/footer/hero, wizard, MTO
+  pre-check, bay tracker, tire calculator, owner drawer and modal action
+  buttons; expands `#voucher-print-area` to 100% width in black/white.
+
+### 4. RFC-4180 CSV Lead Export
+- `exportBookingsToCsv`: exact 15-column header (Work Order Code, Customer
+  Name, Phone, Vehicle Year, Vehicle Make, Vehicle Model, Origin, Class,
+  Date, Time, Mode, Status, Total Low, Total High, Services), CRLF endings,
+  comma/quote/newline escaping with doubled quotes, empty-array header-only.
+- `app.js` gathers lastConfirmedBooking + state.workOrders + SEED_WORK_ORDERS
+  and triggers a `text/csv;charset=utf-8;` Blob download named
+  `revolutions_automotive_bookings.csv`.
+
+### 5. Owner Drawer PIN Authentication & Live Config Overrides
+- `validateOwnerPin`: trimmed, 4-8 digit format check, constant-time XOR
+  compare, default PIN 8351 from `TIER_CONFIG_DEFAULTS.defaultOwnerPin`.
+- `app.js`: drawer toggle with `aria-expanded`, PIN unlock via
+  `Engine.validateOwnerPin`, error/success feedback in
+  `#owner-status-feedback`, `#owner-panel-content` hidden until unlocked,
+  owner overrides (labor rate, supplies cap, banner text) persisted under
+  `revolutions_automotive_state_v1` in `state.ownerConfig`, and live
+  estimate recalculation via the owner-adjusted estimate path.
+
+### 6. Zero-Tolerance Anti-Drift DOM Verification (all 3 phases)
+- Every `getElementById('...')` / `querySelector('#...')` / `querySelectorAll('#...')`
+  ID referenced in `app.js` exists verbatim as an `id="..."` attribute in
+  `index.html` — across Phase 1, Phase 2 AND Phase 3 selectors.
+- All 24 interactive Phase 3 IDs are wired in `app.js` and defined in
+  `index.html`; the JSON-LD script `#seo-schema-json` matches
+  `SEO_SCHEMA_DATA` (AutoRepair, 1-15A Fisherman Dr, Brampton,
+  +1-905-846-8351, geo 43.7196 / -79.7946, 12-service offer catalog).
+
+## OUTPUT FORMAT
+
+Write the audit as pure Markdown with one section per scope item above,
+listing PASS/FAIL per checkpoint with one-line evidence. End the document
+with EXACTLY one final verdict line:
+
+`AUDIT VERDICT: PASS`
+
+or
+
+`AUDIT VERDICT: FAIL`
+
+Use FAIL if any prior assertion was weakened, any anti-drift selector is
+missing from `index.html`, the tire math deviates from the formulas above,
+the CSV escaping breaks RFC-4180, or the print stylesheet fails to isolate
+`#voucher-print-area`.

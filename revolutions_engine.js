@@ -1950,6 +1950,347 @@
     };
   }
 
+  /* ================================================================== */
+  /* Phase 3 - Segment 1: Owner tier configuration, local SEO schema,   */
+  /* tire size calculator, printable voucher, CSV export and owner PIN. */
+  /* ================================================================== */
+
+  var TIER_CONFIG_DEFAULTS = deepFreeze({
+    laborRatePerHour: 130.00,
+    shopSuppliesRate: 0.05,
+    shopSuppliesCap: 35.00,
+    hstRate: 0.13,
+    currency: 'CAD',
+    defaultOwnerPin: '8351',
+    bannerText: 'Seasonal Tire Swap & Ontario Safety (MTO SSC) Specials Active - Call (905) 846-8351',
+    activeCoupons: COUPON_CATALOG.map(function (coupon) { return coupon.code; })
+  });
+
+  var SEO_SCHEMA_DATA = deepFreeze({
+    '@context': 'https://schema.org',
+    '@type': 'AutoRepair',
+    '@id': 'https://revolutionsautomotive.ca/#autorepair',
+    name: 'Revolutions Automotive',
+    description: 'Full-service auto repair, maintenance, computer diagnostics, 4-wheel laser alignments, brakes, tires, air conditioning (R134a & R1234yf) and Ontario Safety Standards Certificates (MTO SSC) in Brampton, ON.',
+    telephone: '+1-905-846-8351',
+    priceRange: '$$',
+    currenciesAccepted: 'CAD',
+    paymentAccepted: 'Cash, Debit, Visa, Mastercard, American Express',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '1-15A Fisherman Dr',
+      addressLocality: 'Brampton',
+      addressRegion: 'ON',
+      postalCode: 'L7A 1B7',
+      addressCountry: 'CA'
+    },
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: 43.7196,
+      longitude: -79.7946
+    },
+    openingHours: ['Mo-Fr 08:00-18:00', 'Sa 08:30-15:00'],
+    openingHoursSpecification: [
+      {
+        '@type': 'OpeningHoursSpecification',
+        dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        opens: '08:00',
+        closes: '18:00'
+      },
+      {
+        '@type': 'OpeningHoursSpecification',
+        dayOfWeek: ['Saturday'],
+        opens: '08:30',
+        closes: '15:00'
+      }
+    ],
+    hasOfferCatalog: {
+      '@type': 'OfferCatalog',
+      name: 'Revolutions Automotive Service Catalog',
+      itemListElement: SERVICE_CATALOG.map(function (service) {
+        return {
+          '@type': 'Offer',
+          priceCurrency: 'CAD',
+          itemOffered: {
+            '@type': 'Service',
+            identifier: service.id,
+            name: service.name,
+            category: service.category,
+            description: service.description
+          }
+        };
+      })
+    }
+  });
+
+  var TIRE_SIZE_PATTERN = /^(?:P|LT)?(\d{3})\/(\d{2,3})(?:ZR|R|\/)(\d{2})$/;
+
+  function parseTireSize(sizeStr) {
+    if (typeof sizeStr !== 'string') return null;
+    var cleaned = sizeStr.trim().toUpperCase().replace(/\s+/g, '');
+    var match = TIRE_SIZE_PATTERN.exec(cleaned);
+    if (!match) return null;
+
+    var width = parseInt(match[1], 10);
+    var aspectRatio = parseInt(match[2], 10);
+    var rimDiameter = parseInt(match[3], 10);
+    if (width < 125 || width > 405) return null;
+    if (aspectRatio < 20 || aspectRatio > 100) return null;
+    if (rimDiameter < 10 || rimDiameter > 28) return null;
+
+    var sidewallHeightMm = round2(width * (aspectRatio / 100));
+    var overallDiameterMm = round2((2 * sidewallHeightMm) + (rimDiameter * 25.4));
+    var overallDiameterInches = round2(overallDiameterMm / 25.4);
+    var circumferenceMm = round2(Math.PI * overallDiameterMm);
+
+    return {
+      normalized: width + '/' + aspectRatio + 'R' + rimDiameter,
+      width: width,
+      aspectRatio: aspectRatio,
+      rimDiameter: rimDiameter,
+      sidewallHeightMm: sidewallHeightMm,
+      overallDiameterMm: overallDiameterMm,
+      overallDiameterInches: overallDiameterInches,
+      circumferenceMm: circumferenceMm
+    };
+  }
+
+  function compareTireSizes(currentSizeStr, targetSizeStr) {
+    var current = parseTireSize(currentSizeStr);
+    var target = parseTireSize(targetSizeStr);
+    if (!current || !target) return null;
+
+    var diameterDiffMm = round2(target.overallDiameterMm - current.overallDiameterMm);
+    var diameterDiffPercent = round2((diameterDiffMm / current.overallDiameterMm) * 100);
+    var isWithinTolerance = Math.abs(diameterDiffPercent) <= 3.0;
+    var speedometerReadingAt100 = Math.round(100 * (current.circumferenceMm / target.circumferenceMm) * 10) / 10;
+
+    return {
+      current: current,
+      target: target,
+      diameterDiffMm: diameterDiffMm,
+      diameterDiffInches: round2(target.overallDiameterInches - current.overallDiameterInches),
+      diameterDiffPercent: diameterDiffPercent,
+      sidewallDiffMm: round2(target.sidewallHeightMm - current.sidewallHeightMm),
+      circumferenceDiffMm: round2(target.circumferenceMm - current.circumferenceMm),
+      speedometerReadingAt100: speedometerReadingAt100,
+      speedometerReadingAt100Kmh: speedometerReadingAt100,
+      actualSpeedAt100Kmh: round2(100 * (target.circumferenceMm / current.circumferenceMm)),
+      speedoDiffKmh: round2(speedometerReadingAt100 - 100),
+      complianceRating: isWithinTolerance ? 'safe' : 'caution',
+      isWithinTolerance: isWithinTolerance,
+      recommendation: isWithinTolerance
+        ? 'Target size is within the OEM +/- 3.0% overall diameter tolerance. Speedometer variance is minimal.'
+        : 'Target size exceeds the OEM +/- 3.0% overall diameter tolerance. Speedometer and ABS calibration may be affected; consult a technician.'
+    };
+  }
+
+  function isValidIsoDate(value) {
+    if (typeof value !== 'string') return false;
+    var match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+    var probe = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    return !isNaN(probe.getTime()) &&
+      probe.getUTCMonth() === Number(match[2]) - 1 &&
+      probe.getUTCDate() === Number(match[3]);
+  }
+
+  function voucherCodeFromSeed(seed) {
+    var hash = 5381;
+    for (var i = 0; i < seed.length; i++) {
+      hash = (((hash << 5) + hash) + seed.charCodeAt(i)) >>> 0;
+    }
+    var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    var chars = '';
+    var remaining = hash >>> 0;
+    for (var c = 0; c < 4; c++) {
+      chars = alphabet.charAt(remaining % 36) + chars;
+      remaining = Math.floor(remaining / 36);
+    }
+    return 'REV-VOUCH-' + chars;
+  }
+
+  function generateVoucherData(estimatePayload, bookingPayload) {
+    var book = (bookingPayload && typeof bookingPayload === 'object') ? bookingPayload : {};
+    var est;
+    if (estimatePayload && typeof estimatePayload === 'object' &&
+        typeof estimatePayload.subtotalLow === 'number' && typeof estimatePayload.totalLow === 'number') {
+      est = estimatePayload;
+    } else if (estimatePayload && typeof estimatePayload === 'object') {
+      est = calculateEstimate(estimatePayload);
+    } else {
+      est = {
+        lineItems: [],
+        couponCode: null,
+        partsLow: 0, partsHigh: 0,
+        laborLow: 0, laborHigh: 0,
+        shopSuppliesLow: 0, shopSuppliesHigh: 0,
+        couponDiscountLow: 0, couponDiscountHigh: 0,
+        totalDiscountLow: 0, totalDiscountHigh: 0,
+        subtotalLow: 0, subtotalHigh: 0,
+        hstLow: 0, hstHigh: 0,
+        totalLow: 0, totalHigh: 0,
+        currency: 'CAD'
+      };
+    }
+
+    var issuedDate = null;
+    var issuedCandidates = [
+      book.issuedDate,
+      (estimatePayload && typeof estimatePayload === 'object') ? estimatePayload.issuedDate : null,
+      book.preferredDate
+    ];
+    for (var i = 0; i < issuedCandidates.length; i++) {
+      if (isValidIsoDate(issuedCandidates[i])) {
+        issuedDate = issuedCandidates[i];
+        break;
+      }
+    }
+    if (!issuedDate) issuedDate = new Date().toISOString().slice(0, 10);
+    var issuedParts = issuedDate.split('-');
+    var expiryMs = Date.UTC(Number(issuedParts[0]), Number(issuedParts[1]) - 1, Number(issuedParts[2])) + 30 * 86400000;
+
+    var customerName = (typeof book.customerName === 'string' && book.customerName.trim())
+      ? book.customerName.trim()
+      : 'Valued Customer';
+    var customerPhone = (typeof book.phone === 'string' && book.phone.trim())
+      ? book.phone.trim()
+      : SHOP_INFO.phone;
+
+    var vehicleParts = [];
+    if (book.vehicleYear !== undefined && book.vehicleYear !== null) vehicleParts.push(String(book.vehicleYear).trim());
+    if (typeof book.vehicleMake === 'string' && book.vehicleMake.trim()) vehicleParts.push(book.vehicleMake.trim());
+    if (typeof book.vehicleModel === 'string' && book.vehicleModel.trim()) vehicleParts.push(book.vehicleModel.trim());
+    var vehicleClass = book.vehicleClass || book.vehicleType || '';
+    var vehicleSummary = (typeof book.vehicleInfo === 'string' && book.vehicleInfo.trim())
+      ? book.vehicleInfo.trim()
+      : vehicleParts.join(' ');
+    if (vehicleClass && vehicleSummary.indexOf('(') === -1) {
+      vehicleSummary = vehicleSummary + ' (' + vehicleClass + ')';
+    }
+    if (!vehicleSummary) vehicleSummary = 'Vehicle to be confirmed at check-in';
+
+    var couponCode = est.couponCode || null;
+    var voucherCode = voucherCodeFromSeed(
+      [customerName, vehicleSummary, couponCode || '', round2(est.totalLow).toFixed(2), issuedDate].join('|')
+    );
+
+    return {
+      voucherCode: voucherCode,
+      issuedDate: issuedDate,
+      expiryDate: new Date(expiryMs).toISOString().slice(0, 10),
+      validDays: 30,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      vehicleSummary: vehicleSummary,
+      couponCode: couponCode,
+      lineItems: Array.isArray(est.lineItems) ? est.lineItems : [],
+      laborTotal: round2(est.laborLow),
+      partsTotal: round2(est.partsLow),
+      shopSuppliesFee: round2(est.shopSuppliesLow),
+      discountAmount: round2(est.totalDiscountLow),
+      subtotalLow: round2(est.subtotalLow),
+      subtotalHigh: round2(est.subtotalHigh),
+      subtotal: round2(est.subtotalLow),
+      hstRate: SHOP_INFO.hstRate,
+      hstLow: round2(est.hstLow),
+      hstHigh: round2(est.hstHigh),
+      hstAmount: round2(est.hstLow),
+      totalLow: round2(est.totalLow),
+      totalHigh: round2(est.totalHigh),
+      totalAmount: round2(est.totalLow),
+      currency: 'CAD',
+      shopInfo: SHOP_INFO,
+      disclaimer: 'Present this voucher at Revolutions Automotive (1-15A Fisherman Dr, Brampton, ON). Valid for 30 days from issue date. Shop supplies billed at 5% of labor up to a maximum of $35.00 CAD. Subject to 13% Ontario HST. Cannot be combined with other offers unless specified.'
+    };
+  }
+
+  var CSV_EXPORT_HEADERS = [
+    'Work Order Code', 'Customer Name', 'Phone', 'Vehicle Year', 'Vehicle Make',
+    'Vehicle Model', 'Origin', 'Class', 'Date', 'Time', 'Mode', 'Status',
+    'Total Low', 'Total High', 'Services'
+  ];
+
+  function csvEscapeField(value) {
+    var str = (value === null || value === undefined) ? '' : String(value);
+    if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 ||
+        str.indexOf('\r') !== -1 || str.indexOf('\n') !== -1) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  }
+
+  function exportBookingsToCsv(bookingsArray) {
+    var lines = [CSV_EXPORT_HEADERS.join(',') + '\r\n'];
+    if (!Array.isArray(bookingsArray)) return lines.join('');
+
+    bookingsArray.forEach(function (item) {
+      item = (item && typeof item === 'object') ? item : {};
+
+      var services = item.services !== undefined ? item.services : item.serviceIds;
+      var servicesField = '';
+      if (Array.isArray(services)) servicesField = services.join('; ');
+      else if (typeof services === 'string') servicesField = services;
+
+      var totalLowStr = '';
+      if (typeof item.totalLow === 'number' && isFinite(item.totalLow)) {
+        totalLowStr = round2(item.totalLow).toFixed(2);
+      } else if (typeof item.estimatedTotal === 'number' && isFinite(item.estimatedTotal)) {
+        totalLowStr = round2(item.estimatedTotal).toFixed(2);
+      }
+      var totalHighStr = '';
+      if (typeof item.totalHigh === 'number' && isFinite(item.totalHigh)) {
+        totalHighStr = round2(item.totalHigh).toFixed(2);
+      } else if (typeof item.estimatedTotal === 'number' && isFinite(item.estimatedTotal)) {
+        totalHighStr = round2(item.estimatedTotal).toFixed(2);
+      }
+
+      var dateField = item.preferredDate || item.appointmentDate || '';
+      if (!dateField && typeof item.createdAt === 'string') dateField = item.createdAt.slice(0, 10);
+
+      var fields = [
+        item.workOrderCode || item.code || item.confirmationCode || 'PENDING',
+        item.customerName || '',
+        item.customerPhone || item.phone || '',
+        (item.vehicleYear !== undefined && item.vehicleYear !== null) ? String(item.vehicleYear) : '',
+        item.vehicleMake || '',
+        item.vehicleModel || '',
+        item.origin || '',
+        item.vehicleClass || item.vehicleType || '',
+        dateField,
+        item.preferredTime || item.appointmentTime || '',
+        item.bookingMode || item.dropOffMode || '',
+        item.currentState || item.status || 'BOOKED',
+        totalLowStr,
+        totalHighStr,
+        servicesField
+      ];
+      lines.push(fields.map(csvEscapeField).join(',') + '\r\n');
+    });
+
+    return lines.join('');
+  }
+
+  function validateOwnerPin(enteredPin, currentPin) {
+    if (enteredPin === null || enteredPin === undefined) return false;
+    if (typeof enteredPin === 'boolean' || typeof enteredPin === 'object') return false;
+
+    var candidate = String(enteredPin).trim();
+    var active = (currentPin !== undefined && currentPin !== null && String(currentPin).trim() !== '')
+      ? String(currentPin).trim()
+      : TIER_CONFIG_DEFAULTS.defaultOwnerPin;
+
+    if (!/^\d{4,8}$/.test(candidate)) return false;
+    if (!/^\d{4,8}$/.test(active)) return false;
+    if (candidate.length !== active.length) return false;
+
+    var diff = 0;
+    for (var i = 0; i < candidate.length; i++) {
+      diff |= candidate.charCodeAt(i) ^ active.charCodeAt(i);
+    }
+    return diff === 0;
+  }
+
   var api = Object.freeze({
     SHOP_INFO: SHOP_INFO,
     VEHICLE_MULTIPLIERS: VEHICLE_MULTIPLIERS,
@@ -1966,7 +2307,14 @@
     evaluateDiagnosticWizard: evaluateDiagnosticWizard,
     evaluateSafetyPreCheck: evaluateSafetyPreCheck,
     lookupWorkOrder: lookupWorkOrder,
-    createWorkOrder: createWorkOrder
+    createWorkOrder: createWorkOrder,
+    TIER_CONFIG_DEFAULTS: TIER_CONFIG_DEFAULTS,
+    SEO_SCHEMA_DATA: SEO_SCHEMA_DATA,
+    parseTireSize: parseTireSize,
+    compareTireSizes: compareTireSizes,
+    generateVoucherData: generateVoucherData,
+    exportBookingsToCsv: exportBookingsToCsv,
+    validateOwnerPin: validateOwnerPin
   });
 
   if (typeof module === 'object' && module.exports) {
