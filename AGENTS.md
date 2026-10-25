@@ -151,3 +151,29 @@ Gate: `node test_revolutions.js` (224/224 PASSED).
   toggle reveals them. Customers see only the code/phone inputs, track and
   clear buttons.
 Gate: `node test_revolutions.js` (238/238 PASSED).
+
+**Phase 6 complete.** Universal phone/plate normalization, plate intake and
+duplicate feedback (251/251 total, append-only test growth from 238):
+- Engine: `normalizePhoneNumber` (strips non-digits, collapses 11-digit +1
+  country code to the 10-digit standard; short input returns the trimmed
+  original) and `normalizePlateNumber` (strips whitespace/hyphens/underscores
+  /dots, uppercases), both exported. `validateBooking` normalizes the phone
+  before the 10-digit check, accepting "(905) 846-8351", "905 846 8351",
+  "+1 (905) 846-8351" etc. `createWorkOrder` accepts the new `plate` field
+  (stored normalized, e.g. "CJDK905", null when absent) alongside the legacy
+  `licensePlate` display field. `lookupWorkOrder` compares phones and plates
+  through the normalizers on both sides and still falls back to matching the
+  raw query box against phone/plate.
+- UI: `#cust-plate` optional plate intake in `#booking-form` ("e.g. CJDK 905",
+  maxlength 10, ".field-hint" explains it enables live bay tracking), bound
+  to `state.customerPlate`, passed as `plate` into `validateBooking` and
+  `createWorkOrder`, and seeded with "CJDK 905" by the sample loader.
+  `#btn-track-vehicle` normalizes phone-shaped searches to 10 digits and
+  plate-shaped searches to the universal plate form before lookup.
+- Duplicate feedback: `addServices` splits requests into `toAdd` and
+  `alreadySelected`; new services add normally (chime + toast + pulse), a
+  mixed batch toasts "✓ Added N service(s) (M already in estimate)", and a
+  fully-duplicate request pulses the estimate card with the toast "ℹ
+  Recommended service(s) are already added to your estimate" instead of
+  staying silent.
+Gate: `node test_revolutions.js` (251/251 PASSED).

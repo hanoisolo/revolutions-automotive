@@ -628,7 +628,9 @@
       errors.push('Customer name is required (minimum 2 characters).');
     }
 
-    var phoneDigits = typeof payload.phone === 'string' ? payload.phone.replace(/\D/g, '') : '';
+    var phoneDigits = typeof payload.phone === 'string'
+      ? normalizePhoneNumber(payload.phone).replace(/\D/g, '')
+      : '';
     if (phoneDigits.length < 10) {
       errors.push('A valid phone number with at least 10 digits is required.');
     }
@@ -1802,21 +1804,49 @@
     return raw.replace(/\D/g, '');
   }
 
-  function normalizePlate(raw) {
-    if (typeof raw !== 'string') return '';
-    return raw.trim().toUpperCase().replace(/[\s-]/g, '');
+  /* ================================================================== */
+  /* Phase 6: universal phone & plate normalizers                       */
+  /* ================================================================== */
+
+  /*
+   * normalizePhoneNumber(phoneStr)
+   * Strips every non-digit character. An 11-digit result starting with the
+   * North American country code 1 collapses to the 10-digit standard number
+   * ("+1 (905) 846-8351" -> "9058468351"). Inputs with fewer than 10 digits
+   * return the original trimmed string so partial entries stay visible.
+   */
+  function normalizePhoneNumber(phoneStr) {
+    if (typeof phoneStr !== 'string') return '';
+    var digits = phoneStr.replace(/\D/g, '');
+    if (digits.length === 11 && digits.charAt(0) === '1') {
+      return digits.slice(1);
+    }
+    if (digits.length >= 10) return digits;
+    return phoneStr.trim();
+  }
+
+  /*
+   * normalizePlateNumber(plateStr)
+   * Strips all whitespace, hyphens, underscores and dots, then uppercases:
+   * "cjdk 905" -> "CJDK905", "cjdk-905" -> "CJDK905", "BVXK-482" -> "BVXK482".
+   */
+  function normalizePlateNumber(plateStr) {
+    if (plateStr === null || plateStr === undefined) return '';
+    return String(plateStr).replace(/[\s\-_.]/g, '').toUpperCase();
   }
 
   function phoneOrPlateMatches(workOrder, term) {
     if (typeof term !== 'string' || term.trim() === '') return false;
-    var digits = phoneDigits(term);
-    var orderDigits = phoneDigits(workOrder.phone);
-    if (digits.length >= 10 && orderDigits.length >= 10) {
-      if (digits === orderDigits) return true;
-    } else if (digits.length === 4) {
-      if (orderDigits.slice(-4) === digits) return true;
+    var termDigits = phoneDigits(normalizePhoneNumber(term));
+    var orderDigits = phoneDigits(normalizePhoneNumber(workOrder.phone));
+    if (termDigits.length >= 10 && orderDigits.length >= 10) {
+      if (termDigits === orderDigits) return true;
+    } else if (termDigits.length === 4) {
+      if (orderDigits.slice(-4) === termDigits) return true;
     }
-    return normalizePlate(term) === normalizePlate(workOrder.licensePlate);
+    var termPlate = normalizePlateNumber(term);
+    var orderPlate = normalizePlateNumber(workOrder.licensePlate || workOrder.plate || '');
+    return termPlate !== '' && termPlate === orderPlate;
   }
 
   /* ================================================================== */
@@ -1967,7 +1997,13 @@
 
     var customerName = typeof b.customerName === 'string' ? b.customerName.trim() : '';
     var phone = typeof b.phone === 'string' ? b.phone.trim() : '';
-    var licensePlate = typeof b.licensePlate === 'string' ? b.licensePlate.trim().toUpperCase() : '';
+    /* Phase 6 plate intake: accept the dedicated `plate` field (stored in
+       normalized form) while preserving the legacy `licensePlate` field and
+       its verbatim display format for existing callers. */
+    var hasPlateField = typeof b.plate === 'string' && b.plate.trim();
+    var plateSource = hasPlateField ? b.plate : b.licensePlate;
+    var licensePlate = typeof plateSource === 'string' ? plateSource.trim().toUpperCase() : '';
+    var plate = hasPlateField ? normalizePlateNumber(b.plate) : null;
 
     var vehicleParts = [];
     if (b.vehicleYear !== undefined && b.vehicleYear !== null) vehicleParts.push(String(b.vehicleYear).trim());
@@ -2012,6 +2048,7 @@
       customerName: customerName,
       phone: phone,
       licensePlate: licensePlate,
+      plate: plate,
       vehicle: vehicle,
       vehicleType: b.vehicleClass || b.vehicleType || 'sedan',
       serviceIds: serviceIds,
@@ -2386,6 +2423,8 @@
     maskCustomerName: maskCustomerName,
     maskLicensePlate: maskLicensePlate,
     maskPhoneNumber: maskPhoneNumber,
+    normalizePhoneNumber: normalizePhoneNumber,
+    normalizePlateNumber: normalizePlateNumber,
     TIER_CONFIG_DEFAULTS: TIER_CONFIG_DEFAULTS,
     SEO_SCHEMA_DATA: SEO_SCHEMA_DATA,
     parseTireSize: parseTireSize,

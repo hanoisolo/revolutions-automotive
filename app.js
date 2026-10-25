@@ -20,6 +20,7 @@
     couponCode: '',
     customerName: '',
     customerPhone: '',
+    customerPlate: '',
     appointmentDate: '',
     appointmentTime: '',
     bookingMode: 'drop_off',
@@ -208,18 +209,32 @@
   }
 
   function addServices(serviceIds) {
-    var newlyAdded = 0;
-    serviceIds.forEach(function (id) {
+    /* Duplicate-aware intake: split the requested ids into services still
+       missing from the estimate (toAdd) and services already selected
+       (alreadySelected) so the customer gets precise feedback either way. */
+    var toAdd = [];
+    var alreadySelected = [];
+    (serviceIds || []).forEach(function (id) {
       if (state.selectedServiceIds.indexOf(id) === -1) {
-        state.selectedServiceIds.push(id);
-        newlyAdded++;
+        toAdd.push(id);
+      } else {
+        alreadySelected.push(id);
       }
     });
-    saveState();
-    if (document.getElementById('service-grid')) renderServiceGrid();
-    if (document.getElementById('estimate-summary-card')) recalculateAndRenderEstimate();
-    runLiveBookingValidation(false);
-    if (newlyAdded > 0) notifyAddedServices(newlyAdded);
+
+    if (toAdd.length > 0) {
+      toAdd.forEach(function (id) {
+        state.selectedServiceIds.push(id);
+      });
+      saveState();
+      if (document.getElementById('service-grid')) renderServiceGrid();
+      if (document.getElementById('estimate-summary-card')) recalculateAndRenderEstimate();
+      runLiveBookingValidation(false);
+      notifyAddedServices(toAdd.length, alreadySelected.length);
+    } else if (alreadySelected.length > 0) {
+      notifyAlreadyAddedServices();
+    }
+    return toAdd.length;
   }
 
   /* -------------------------------------------------------------- */
@@ -251,12 +266,35 @@
     }
   }
 
-  function notifyAddedServices(count) {
+  function notifyAddedServices(count, alreadyCount) {
     playAddServiceChime();
     var toast = document.getElementById('toast-notification');
     if (toast) {
-      toast.textContent = '\u2713 Added ' + count + ' Recommended Service' +
-        (count === 1 ? '' : 's') + ' to Estimate!';
+      toast.textContent = alreadyCount > 0
+        ? '\u2713 Added ' + count + ' service(s) (' + alreadyCount + ' already in estimate)'
+        : '\u2713 Added ' + count + ' Recommended Service' + (count === 1 ? '' : 's') + ' to Estimate!';
+      toast.classList.remove('is-visible');
+      void toast.offsetWidth;
+      toast.classList.add('is-visible');
+      window.setTimeout(function () {
+        toast.classList.remove('is-visible');
+      }, 3200);
+    }
+    var estimateCard = document.getElementById('estimate-summary-card');
+    if (estimateCard) {
+      estimateCard.classList.add('est-highlight-pulse');
+      window.setTimeout(function () {
+        estimateCard.classList.remove('est-highlight-pulse');
+      }, 900);
+    }
+  }
+
+  /* Nothing new to add - do not stay silent: pulse the estimate card so the
+     customer sees where the services already live, and say so in the toast. */
+  function notifyAlreadyAddedServices() {
+    var toast = document.getElementById('toast-notification');
+    if (toast) {
+      toast.textContent = '\u2139 Recommended service(s) are already added to your estimate';
       toast.classList.remove('is-visible');
       void toast.offsetWidth;
       toast.classList.add('is-visible');
@@ -517,6 +555,14 @@
       saveState();
       runLiveBookingValidation(false);
     });
+    var plateField = document.getElementById('cust-plate');
+    if (plateField) {
+      plateField.addEventListener('input', function (event) {
+        state.customerPlate = event.target.value;
+        saveState();
+        runLiveBookingValidation(false);
+      });
+    }
     document.getElementById('booking-date').addEventListener('input', function (event) {
       state.appointmentDate = event.target.value;
       saveState();
@@ -558,6 +604,7 @@
     return {
       customerName: state.customerName,
       phone: state.customerPhone,
+      plate: state.customerPlate,
       vehicleYear: state.year,
       vehicleMake: state.make,
       vehicleModel: state.model,
@@ -644,6 +691,7 @@
     state.couponCode = 'BRAKE50';
     state.customerName = 'Don Miller';
     state.customerPhone = '(905) 555-0149';
+    state.customerPlate = 'CJDK 905';
     state.appointmentDate = nextTuesdayISO();
     state.appointmentTime = '10:00';
     state.bookingMode = 'wait_in_lounge';
@@ -657,6 +705,8 @@
   function syncBookingInputs() {
     document.getElementById('cust-name').value = state.customerName;
     document.getElementById('cust-phone').value = state.customerPhone;
+    var plateField = document.getElementById('cust-plate');
+    if (plateField) plateField.value = state.customerPlate;
     document.getElementById('booking-date').value = state.appointmentDate;
     document.getElementById('booking-time').value = state.appointmentTime;
     document.getElementById('booking-mode').value = state.bookingMode;
@@ -1039,6 +1089,14 @@
        plate, invoice totals omitted). A provided value acts as secondary
        verification and unlocks the full record. */
     var verification = (typeof phoneOrPlate === 'string' && phoneOrPlate.trim()) ? phoneOrPlate : null;
+    if (verification) {
+      /* Universal normalization before lookup: phone-shaped values collapse
+         to 10 digits, everything else is treated as a plate. */
+      var normalizedPhone = Engine.normalizePhoneNumber(verification);
+      verification = normalizedPhone.replace(/\D/g, '').length >= 10
+        ? normalizedPhone
+        : Engine.normalizePlateNumber(verification);
+    }
     var workOrder = Engine.lookupWorkOrder(code, verification, state.workOrders);
 
     if (!workOrder) {

@@ -2700,6 +2700,187 @@ test('anti-drift: the Phase 5 DOM IDs exist verbatim on every surface that uses 
   });
 });
 
+/* ================================================================== */
+/* Phone & Plate Normalization and Duplicate Feedback                 */
+/* ================================================================== */
+
+group('Phone & Plate Normalization and Duplicate Feedback');
+
+test('normalizePhoneNumber collapses every formatted variation to 10 digits', function () {
+  ['(905) 846-8351', '905-846-8351', '905 846 8351', '9058468351',
+   '+1 (905) 846-8351', '1-905-846-8351', '19058468351'
+  ].forEach(function (variant) {
+    assert.strictEqual(Engine.normalizePhoneNumber(variant), '9058468351',
+      'variant must normalize to the 10-digit standard: ' + variant);
+  });
+});
+
+test('normalizePhoneNumber returns the trimmed original for short input', function () {
+  assert.strictEqual(Engine.normalizePhoneNumber('905-555-01'), '905-555-01',
+    'partial entries below 10 digits must stay visible');
+  assert.strictEqual(Engine.normalizePhoneNumber('  905 555  '), '905 555');
+  assert.strictEqual(Engine.normalizePhoneNumber(''), '');
+  assert.strictEqual(Engine.normalizePhoneNumber(null), '');
+  assert.strictEqual(Engine.normalizePhoneNumber(9055550192), '');
+});
+
+test('normalizePlateNumber strips separators and uppercases universally', function () {
+  assert.strictEqual(Engine.normalizePlateNumber('cjdk 905'), 'CJDK905');
+  assert.strictEqual(Engine.normalizePlateNumber('cjdk-905'), 'CJDK905');
+  assert.strictEqual(Engine.normalizePlateNumber('CJDK905'), 'CJDK905');
+  assert.strictEqual(Engine.normalizePlateNumber('  cjdk.905  '), 'CJDK905');
+  assert.strictEqual(Engine.normalizePlateNumber('cjdk_905'), 'CJDK905');
+  assert.strictEqual(Engine.normalizePlateNumber('BVXK-482'), 'BVXK482');
+  assert.strictEqual(Engine.normalizePlateNumber(''), '');
+  assert.strictEqual(Engine.normalizePlateNumber(null), '');
+});
+
+test('lookupWorkOrder verifies REV-3105 by phone across formats and via the query box', function () {
+  ['9055550192', '(905) 555-0192', '905-555-0192', '905 555 0192', '+1 (905) 555-0192']
+    .forEach(function (variant) {
+      var found = Engine.lookupWorkOrder('REV-3105', variant);
+      assert.strictEqual(found.code, 'REV-3105',
+        'phone variant must verify REV-3105: ' + variant);
+      assert.strictEqual(found.sanitized, undefined,
+        'a verified phone lookup returns the full record');
+    });
+  assert.strictEqual(Engine.lookupWorkOrder('9055550192').code, 'REV-3105',
+    'a phone typed into the query box must still resolve');
+  assert.strictEqual(Engine.lookupWorkOrder('+1 (905) 555-0192').code, 'REV-3105',
+    'an 11-digit +1 phone in the query box must normalize and resolve');
+});
+
+test('lookupWorkOrder verifies REV-3105 by plate across formats and via the query box', function () {
+  ['cjdk905', 'cjdk 905', 'CJDK-905', 'cjdk.905', 'CJDK 905']
+    .forEach(function (variant) {
+      var found = Engine.lookupWorkOrder('REV-3105', variant);
+      assert.strictEqual(found.code, 'REV-3105',
+        'plate variant must verify REV-3105: ' + variant);
+    });
+  assert.strictEqual(Engine.lookupWorkOrder('cjdk905').code, 'REV-3105',
+    'a plate typed into the query box must still resolve');
+  assert.strictEqual(Engine.lookupWorkOrder('cjdk.905').code, 'REV-3105',
+    'a dotted plate in the query box must normalize and resolve');
+});
+
+test('validateBooking accepts universally formatted phone numbers', function () {
+  ['(905) 846-8351', '905-846-8351', '905 846 8351',
+   '+1 (905) 846-8351', '9058468351', '1-905-846-8351'
+  ].forEach(function (variant) {
+    var result = Engine.validateBooking(makeBooking({ phone: variant }));
+    assert.strictEqual(result.valid, true,
+      'formatted phone must validate: ' + variant);
+    assert.deepStrictEqual(result.errors, [],
+      'no validation errors expected for: ' + variant);
+  });
+});
+
+test('createWorkOrder accepts the plate field and stores it normalized', function () {
+  var wo = Engine.createWorkOrder({
+    customerName: 'Plate Intake',
+    phone: '(905) 555-0111',
+    plate: 'cjdk 905',
+    vehicleYear: 2020,
+    vehicleMake: 'Honda',
+    vehicleModel: 'Civic',
+    vehicleClass: 'sedan',
+    serviceIds: ['oil_full_synth'],
+    appointmentDate: '2026-11-04',
+    appointmentTime: '10:00'
+  }, { estimatedTotal: 100 }, { nowTimestamp: '2026-11-01T10:00:00.000Z' });
+  assert.strictEqual(wo.plate, 'CJDK905',
+    'the plate field must be stored in universal normalized form');
+  assert.strictEqual(wo.licensePlate, 'CJDK 905',
+    'the legacy display field must stay populated for tracker lookups');
+  var pool = [wo];
+  ['CJDK-905', 'cjdk905', '  cjdk.905 '].forEach(function (variant) {
+    assert.strictEqual(Engine.lookupWorkOrder(wo.code, variant, pool).code, wo.code,
+      'created order must verify by any plate format: ' + variant);
+  });
+});
+
+test('createWorkOrder keeps the legacy licensePlate path intact', function () {
+  var wo = Engine.createWorkOrder({
+    customerName: 'Legacy Path',
+    phone: '(905) 555-0122',
+    licensePlate: 'SAMR 180',
+    vehicleYear: 2020,
+    vehicleMake: 'Honda',
+    vehicleModel: 'Civic',
+    vehicleClass: 'sedan',
+    serviceIds: ['oil_full_synth'],
+    appointmentDate: '2026-11-04',
+    appointmentTime: '10:00'
+  }, { estimatedTotal: 100 }, { nowTimestamp: '2026-11-01T10:00:00.000Z' });
+  assert.strictEqual(wo.licensePlate, 'SAMR 180');
+  assert.strictEqual(wo.plate, null,
+    'orders created without the plate field must store null');
+});
+
+test('index.html ships the optional license plate intake field', function () {
+  assert.ok(INDEX_HTML.indexOf('id="cust-plate"') !== -1,
+    'index.html must define #cust-plate verbatim');
+  assert.ok(INDEX_HTML.indexOf('for="cust-plate"') !== -1,
+    'the plate input must be labelled');
+  assert.ok(INDEX_HTML.indexOf('name="plate"') !== -1,
+    'the plate input must submit under the name plate');
+  assert.ok(INDEX_HTML.indexOf('placeholder="e.g. CJDK 905"') !== -1,
+    'the plate input must carry the CJDK 905 placeholder');
+  assert.ok(INDEX_HTML.indexOf('maxlength="10"') !== -1,
+    'the plate input must cap entry at 10 characters');
+  assert.ok(INDEX_HTML.indexOf('Enables Live Bay Tracking') !== -1,
+    'the label must explain the plate enables live bay tracking');
+});
+
+test('app.js reads the plate field, persists it and seeds the sample plate', function () {
+  ['cust-plate', 'state.customerPlate', 'plate: state.customerPlate', "'CJDK 905'"
+  ].forEach(function (token) {
+    assert.ok(APP_JS.indexOf(token) !== -1,
+      'plate intake must wire: ' + token);
+  });
+  assert.ok(APP_JS.indexOf("getElementById('cust-plate')") !== -1,
+    'the plate input must be read from the DOM');
+});
+
+test('app.js normalizes tracker search inputs before lookupWorkOrder', function () {
+  ['Engine.normalizePhoneNumber', 'Engine.normalizePlateNumber'].forEach(function (token) {
+    assert.ok(APP_JS.indexOf(token) !== -1,
+      'trackVehicle must normalize with: ' + token);
+  });
+  assert.ok(APP_JS.indexOf('lookupWorkOrder(code, verification') !== -1,
+    'the normalized verification value must reach lookupWorkOrder');
+});
+
+test('app.js gives duplicate-aware feedback for recommended services', function () {
+  ['toAdd', 'alreadySelected', 'notifyAlreadyAddedServices',
+   'already in estimate',
+   'Recommended service(s) are already added to your estimate',
+   'Recommended Service', 'to Estimate!'
+  ].forEach(function (token) {
+    assert.ok(APP_JS.indexOf(token) !== -1,
+      'duplicate feedback must implement: ' + token);
+  });
+  assert.ok(APP_JS.indexOf("notifyAddedServices(toAdd.length, alreadySelected.length)") !== -1,
+    'the add path must report both counts');
+  assert.ok((APP_JS.match(/est-highlight-pulse/g) || []).length >= 4,
+    'the estimate card pulse must fire on both the add and duplicate paths');
+});
+
+test('anti-drift: 100% of DOM IDs queried in app.js exist in index.html', function () {
+  var ids = [];
+  var reGetById = /getElementById\(\s*['"]([^'"]+)['"]\s*\)/g;
+  var reQueryId = /querySelector(?:All)?\(\s*['"]#([A-Za-z0-9_-]+)['"]\s*\)/g;
+  var match;
+  while ((match = reGetById.exec(APP_JS)) !== null) ids.push(match[1]);
+  while ((match = reQueryId.exec(APP_JS)) !== null) ids.push(match[1]);
+  assert.ok(ids.length >= 60, 'expected a substantial DOM reference set');
+  var missing = ids.filter(function (id) {
+    return INDEX_HTML.indexOf('id="' + id + '"') === -1;
+  });
+  assert.deepStrictEqual(missing, [],
+    'every DOM ID queried in app.js must exist in index.html');
+});
+
 /* ------------------------------------------------------------------ */
 /* report                                                              */
 /* ------------------------------------------------------------------ */
