@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Revolutions Automotive | Auto Repair, Diagnostics &amp; Tires in Brampton, ON</title>
+  <meta name="description" content="Revolutions Automotive at 1-15A Fisherman Dr, Brampton, ON L7A 1B7. Full-service domestic &amp; import auto repair, computer diagnostics, 4-wheel laser alignments, brakes, tires, A/C and Ontario Safety Standards Certificates. Call (905) 846-8351.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="utility-bar">
+      <span id="shop-address-header" class="utility-item">1-15A Fisherman Dr, Brampton, ON L7A 1B7</span>
+      <span id="shop-hours-badge" class="utility-item utility-hours">Mon&ndash;Fri 8 AM&ndash;6 PM &middot; Sat 8:30 AM&ndash;3 PM &middot; Sun Closed</span>
+      <a id="shop-phone-header" class="utility-item utility-phone" href="tel:+19058468351">(905) 846-8351</a>
+    </div>
+    <div class="masthead">
+      <div class="brand-block">
+        <div class="brand-mark">RA</div>
+        <div class="brand-text">
+          <h1 class="brand-name">Revolutions Automotive</h1>
+          <p class="brand-tagline">Brampton&rsquo;s Domestic &amp; Import Repair, Diagnostics &amp; Safety Centre</p>
+        </div>
+      </div>
+      <button id="btn-load-sample" type="button" class="btn btn-sample">Load Sample Vehicle &amp; Estimate</button>
+    </div>
+    <nav class="quick-nav" aria-label="Page sections">
+      <a href="#symptom-section">Symptom Checker</a>
+      <a href="#catalog-section">Services</a>
+      <a href="#coupon-section">Coupons</a>
+      <a href="#booking-section">Book a Bay</a>
+      <a href="#safety-showcase">MTO Safety Certificate</a>
+    </nav>
+  </header>
+
+  <section class="hero" id="hero">
+    <img class="hero-photo" src="assets/hero_bay.jpg" alt="State-of-the-art automotive repair and laser wheel alignment service bay at Revolutions Automotive">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <p class="hero-kicker">Full-Service Auto Repair &middot; Brampton, Ontario</p>
+        <h2 class="hero-headline">Domestic &amp; Import Repair, Done Right the First Time</h2>
+        <p class="hero-sub">Brakes, tires, 4-wheel laser alignments, state-of-the-art computer diagnostics, A/C service and Ontario Safety Standards Certificates &mdash; all under one roof at 1-15A Fisherman Dr.</p>
+        <ul class="hero-trust">
+          <li>Upfront CAD estimates with 13% HST shown</li>
+          <li>10&ndash;15% multi-service shared-hoist labor discount</li>
+          <li>MTO Safety Standards Certificate inspections</li>
+        </ul>
+      </div>
+      <div class="vehicle-profile-card" id="vehicle-profile">
+        <h3 class="panel-title">Your Vehicle Profile</h3>
+        <p class="panel-hint">Pricing adjusts for vehicle origin and class.</p>
+        <div class="field-row">
+          <label for="vehicle-origin-select">Origin</label>
+          <select id="vehicle-origin-select">
+            <option value="domestic">Domestic (Ford, GM, Stellantis)</option>
+            <option value="asian_import">Asian Import (Toyota, Honda, Mazda)</option>
+            <option value="euro_import">European Import (BMW, Audi, VW)</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label for="vehicle-class-select">Vehicle Class</label>
+          <select id="vehicle-class-select">
+            <option value="sedan">Compact / Sedan / Coupe</option>
+            <option value="suv">Crossover / SUV / Minivan</option>
+            <option value="truck">Pickup / Heavy SUV / Van</option>
+          </select>
+        </div>
+        <div class="field-row field-row-3">
+          <div>
+            <label for="vehicle-year-input">Year</label>
+            <input id="vehicle-year-input" type="number" min="1980" max="2027" placeholder="2021">
+          </div>
+          <div>
+            <label for="vehicle-make-input">Make</label>
+            <input id="vehicle-make-input" type="text" placeholder="Toyota">
+          </div>
+          <div>
+            <label for="vehicle-model-input">Model</label>
+            <input id="vehicle-model-input" type="text" placeholder="RAV4 XLE">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="page-main">
+
+    <section class="section" id="symptom-section">
+      <header class="section-head">
+        <h2>What&rsquo;s Going On With Your Vehicle?</h2>
+        <p>Tap a symptom and our technician engine recommends the right services &mdash; with plain-English notes.</p>
+      </header>
+      <div id="symptom-chips" class="chip-row" aria-label="Vehicle symptoms"></div>
+      <div id="symptom-recommendations" class="symptom-recommendations" aria-live="polite"></div>
+    </section>
+
+    <section class="section" id="catalog-section">
+      <header class="section-head">
+        <h2>Our Services</h2>
+        <p>12 core services across Brakes, Tires &amp; Alignment, Computer Diagnostics, Oil &amp; Tune-Up, Air Conditioning and Suspension / Exhaust / Safety Certificate. Select any card to add it to your live estimate.</p>
+      </header>
+      <div id="category-filter-bar" class="filter-bar" role="tablist" aria-label="Service categories"></div>
+      <div id="service-grid" class="service-grid" aria-label="Service catalog"></div>
+    </section>
+
+    <section class="section" id="coupon-section">
+      <header class="section-head">
+        <h2>Service Coupons</h2>
+        <p>Midas-style savings, applied instantly to your estimate.</p>
+      </header>
+      <div id="coupon-wallet-grid" class="coupon-wallet" aria-label="Coupon wallet"></div>
+      <div class="coupon-select-row">
+        <label for="coupon-select">Active coupon</label>
+        <select id="coupon-select">
+          <option value="">No coupon</option>
+          <option value="SYNTH15">SYNTH15 &mdash; $15 Off Full Synthetic Oil Change</option>
+          <option value="ALIGN25">ALIGN25 &mdash; $25 Off 4-Wheel Alignment with Tire Service</option>
+          <option value="DIAG50">DIAG50 &mdash; 50% Off Computer Diagnostic with Repair</option>
+          <option value="BRAKE50">BRAKE50 &mdash; $50 Off Complete Brake Job</option>
+          <option value="SAFETY10">SAFETY10 &mdash; $10 Off Ontario Safety Standards Certificate</option>
+        </select>
+      </div>
+    </section>
+
+    <div class="workspace" id="estimate-workspace">
+      <aside id="estimate-summary-card" class="estimate-card" aria-label="Live estimate summary">
+        <h3>Your Live Estimate</h3>
+        <p id="est-selected-count" class="est-count">0 services selected</p>
+        <ul id="est-line-items" class="est-line-items"></ul>
+        <dl class="est-rows">
+          <div class="est-row"><dt>Parts</dt><dd id="est-parts">$0.00 CAD</dd></div>
+          <div class="est-row"><dt>Labor</dt><dd id="est-labor">$0.00 CAD</dd></div>
+          <div class="est-row est-row-discount"><dt>Shared-Hoist Combo Discount</dt><dd id="est-combo-discount">&minus;$0.00 CAD</dd></div>
+          <div class="est-row"><dt>Shop Supplies &amp; Environmental</dt><dd id="est-shop-supplies">$0.00 CAD</dd></div>
+          <div class="est-row est-row-discount"><dt>Coupon Savings</dt><dd id="est-discount">&minus;$0.00 CAD</dd></div>
+          <div class="est-row"><dt>Subtotal</dt><dd id="est-subtotal">$0.00 CAD</dd></div>
+          <div class="est-row"><dt>HST (13%)</dt><dd id="est-hst">$0.00 CAD</dd></div>
+          <div class="est-row est-row-total"><dt>Estimated Total Range</dt><dd id="est-total-range">$0.00&ndash;$0.00 CAD</dd></div>
+        </dl>
+        <p id="est-coupon-status" class="est-coupon-status">No coupon selected.</p>
+        <p class="est-fineprint">Estimates include Ontario 13% HST. Shop supplies capped at $35.00 CAD.</p>
+      </aside>
+
+      <section class="section section-booking" id="booking-section">
+        <header class="section-head">
+          <h2>Book a Service Bay</h2>
+          <p>Reserve a bay at 1-15A Fisherman Dr, Brampton. Mon&ndash;Fri 8 AM&ndash;6 PM, Sat 8:30 AM&ndash;3 PM, closed Sunday.</p>
+        </header>
+        <form id="booking-form" class="booking-form" novalidate>
+          <div class="field-row">
+            <div>
+              <label for="cust-name">Full Name</label>
+              <input id="cust-name" type="text" autocomplete="name" placeholder="Marcus Vance">
+            </div>
+            <div>
+              <label for="cust-phone">Phone</label>
+              <input id="cust-phone" type="tel" autocomplete="tel" placeholder="(905) 555-0194">
+            </div>
+          </div>
+          <div class="field-row field-row-3">
+            <div>
+              <label for="booking-date">Preferred Date</label>
+              <input id="booking-date" type="date">
+            </div>
+            <div>
+              <label for="booking-time">Preferred Time</label>
+              <input id="booking-time" type="time" step="900">
+            </div>
+            <div>
+              <label for="booking-mode">Visit Mode</label>
+              <select id="booking-mode">
+                <option value="drop_off">Drop Off My Vehicle</option>
+                <option value="wait_in_lounge">Wait In Our Lounge</option>
+              </select>
+            </div>
+          </div>
+          <button id="booking-submit-btn" type="submit" class="btn btn-primary">Request Appointment</button>
+          <div id="booking-feedback" class="booking-feedback" aria-live="polite"></div>
+        </form>
+      </section>
+    </div>
+
+    <section class="section showcase" id="safety-showcase">
+      <article class="showcase-card">
+        <img src="assets/safety_badge.jpg" alt="Ontario Certified Auto Repair and Safety Standards Inspection Center emblem" class="showcase-img">
+        <div class="showcase-body">
+          <h3>Ontario Safety Standards Certificate (MTO SSC)</h3>
+          <p>Buying, selling or registering a used vehicle, or joining a rideshare platform? Ontario requires a Safety Standards Certificate before registration. We perform the full MTO inspection &mdash; brakes, steering, suspension, tires, lighting, windshield and exhaust &mdash; and issue the certificate on a pass. Mention coupon <strong>SAFETY10</strong> to save $10.</p>
+          <ul>
+            <li>Used-vehicle pre-purchase compliance inspections</li>
+            <li>Rideshare and taxi licensing inspections</li>
+            <li>Exhaust system checks included</li>
+          </ul>
+        </div>
+      </article>
+      <article class="showcase-card showcase-card-reverse">
+        <img src="assets/diagnostics_tech.jpg" alt="State-of-the-art automotive computer diagnostic scanner connected to a modern engine bay" class="showcase-img">
+        <div class="showcase-body">
+          <h3>State-of-the-Art Computer Diagnostics</h3>
+          <p>Check engine light, electrical gremlins or a battery drain? Our OEM-level scan tools and pin-point testing find the real fault &mdash; no guess-and-replace repairs. The diagnostic fee is credited toward the repair, and coupon <strong>DIAG50</strong> takes 50% off when you repair with us.</p>
+          <ul>
+            <li>OEM-level full-system scans and pinpoint tests</li>
+            <li>Alternator, battery and parasitic draw diagnosis</li>
+            <li>R134a &amp; R1234yf A/C recovery and recharge</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div>
+        <h4>Revolutions Automotive</h4>
+        <p>1-15A Fisherman Dr, Brampton, ON L7A 1B7</p>
+        <p><a href="tel:+19058468351">(905) 846-8351</a></p>
+      </div>
+      <div>
+        <h4>Hours</h4>
+        <p>Mon&ndash;Fri: 8:00 AM &ndash; 6:00 PM</p>
+        <p>Saturday: 8:30 AM &ndash; 3:00 PM</p>
+        <p>Sunday: Closed</p>
+      </div>
+      <div>
+        <h4>Specialties</h4>
+        <p>Auto Repairs &middot; Maintenance &middot; A/C (R134a &amp; R1234yf) &middot; Oil Changes &middot; Computer Diagnostics &middot; Tune-Ups &middot; 4-Wheel Laser Alignments &middot; Brakes &middot; Tires &middot; Suspension &amp; Steering &middot; Exhaust &middot; MTO Safety Certificates</p>
+      </div>
+    </div>
+    <p class="footer-legal">Domestic &amp; import vehicles welcome. Estimates in CAD plus 13% Ontario HST.</p>
+  </footer>
+
+  <script src="revolutions_engine.js"></script>
+</body>
+</html>

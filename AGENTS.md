@@ -18,11 +18,16 @@
 AGENTS.md
 revolutions_engine.js
 test_revolutions.js
+index.html
+styles.css
 plans/
   prompt_stage2.txt
   MASTER_ROADMAP.md
   ROADMAP.md
 assets/
+  hero_bay.jpg
+  diagnostics_tech.jpg
+  safety_badge.jpg
 ```
 
 ## Test Gate Command
@@ -41,6 +46,6 @@ any command.
 
 ## Current Status
 
-Stage 1 & Stage 2 complete. **Phase 1 — Segment 1 complete**
-(`revolutions_engine.js` + `test_revolutions.js`, gate green 68/68).
-**Phase 1 — Segment 2 pending** (index.html, styles.css, AI assets).
+Stage 1 & Stage 2 complete. **Phase 1 — Segments 1 and 2 complete**
+(engine + tests 82/82 green; index.html, styles.css and 3 AI assets).
+**Phase 1 — Segment 3 pending** (app.js controller + anti-drift tests).

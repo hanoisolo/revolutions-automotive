@@ -5,6 +5,7 @@
 'use strict';
 
 var assert = require('assert');
+var fs = require('fs');
 var Engine = require('./revolutions_engine.js');
 
 var total = 0;
@@ -601,6 +602,128 @@ test('buying a used car maps to MTO SSC as primary', function () {
   var r = Engine.recommendServicesBySymptoms(['buying_used_car']);
   assert.ok(r.recommendedServiceIds.indexOf('mto_safety_exhaust') !== -1);
   assert.deepStrictEqual(r.primaryServiceIds, ['mto_safety_exhaust']);
+});
+
+/* ------------------------------------------------------------------ */
+/* Segment 2 Asset & DOM Integrity Tests                                */
+/* ------------------------------------------------------------------ */
+
+group('Segment 2 Assets & DOM');
+
+var MANDATORY_ASSETS = ['assets/hero_bay.jpg', 'assets/diagnostics_tech.jpg', 'assets/safety_badge.jpg'];
+
+MANDATORY_ASSETS.forEach(function (assetPath) {
+  test('asset exists on disk and exceeds 10,000 bytes: ' + assetPath, function () {
+    assert.ok(fs.existsSync(assetPath), 'missing asset: ' + assetPath);
+    var stats = fs.statSync(assetPath);
+    assert.ok(stats.size > 10000, assetPath + ' is only ' + stats.size + ' bytes');
+  });
+
+  test('asset starts with JPEG magic bytes FF D8 FF: ' + assetPath, function () {
+    var fd = fs.openSync(assetPath, 'r');
+    var buf = Buffer.alloc(3);
+    var bytesRead = fs.readSync(fd, buf, 0, 3, 0);
+    fs.closeSync(fd);
+    assert.strictEqual(bytesRead, 3, assetPath + ' is too small to read a header');
+    assert.strictEqual(buf[0], 0xFF, assetPath + ' byte 0 is not 0xFF');
+    assert.strictEqual(buf[1], 0xD8, assetPath + ' byte 1 is not 0xD8');
+    assert.strictEqual(buf[2], 0xFF, assetPath + ' byte 2 is not 0xFF');
+  });
+});
+
+var INDEX_HTML = fs.readFileSync('index.html', 'utf8');
+var STYLES_CSS = fs.readFileSync('styles.css', 'utf8');
+
+test('index.html exists and is a substantial document (> 500 chars)', function () {
+  assert.ok(INDEX_HTML.length > 500, 'index.html is only ' + INDEX_HTML.length + ' chars');
+  assert.ok(INDEX_HTML.indexOf('<!DOCTYPE html>') !== -1, 'index.html must declare doctype');
+});
+
+test('styles.css exists and is a substantial stylesheet (> 500 chars)', function () {
+  assert.ok(STYLES_CSS.length > 500, 'styles.css is only ' + STYLES_CSS.length + ' chars');
+});
+
+var MANDATORY_DOM_IDS = [
+  'shop-phone-header',
+  'shop-address-header',
+  'shop-hours-badge',
+  'btn-load-sample',
+  'vehicle-origin-select',
+  'vehicle-class-select',
+  'vehicle-year-input',
+  'vehicle-make-input',
+  'vehicle-model-input',
+  'symptom-chips',
+  'symptom-recommendations',
+  'category-filter-bar',
+  'service-grid',
+  'coupon-wallet-grid',
+  'coupon-select',
+  'estimate-summary-card',
+  'est-selected-count',
+  'est-line-items',
+  'est-parts',
+  'est-labor',
+  'est-combo-discount',
+  'est-shop-supplies',
+  'est-discount',
+  'est-coupon-status',
+  'est-subtotal',
+  'est-hst',
+  'est-total-range',
+  'booking-form',
+  'cust-name',
+  'cust-phone',
+  'booking-date',
+  'booking-time',
+  'booking-mode',
+  'booking-submit-btn',
+  'booking-feedback'
+];
+
+test('every mandatory DOM ID exists verbatim in index.html', function () {
+  MANDATORY_DOM_IDS.forEach(function (id) {
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+      'index.html is missing mandatory DOM ID: #' + id);
+  });
+});
+
+test('index.html links styles.css and the engine script before closing body', function () {
+  assert.ok(INDEX_HTML.indexOf('styles.css') !== -1, 'index.html must reference styles.css');
+  assert.ok(INDEX_HTML.indexOf('<script src="revolutions_engine.js"></script>') !== -1,
+    'index.html must link revolutions_engine.js');
+  assert.ok(INDEX_HTML.indexOf('<script src="revolutions_engine.js"></script>') <
+    INDEX_HTML.indexOf('</body>'), 'engine script must load before closing body tag');
+});
+
+test('index.html features all 3 generated assets', function () {
+  assert.ok(INDEX_HTML.indexOf('assets/hero_bay.jpg') !== -1, 'hero_bay.jpg must be referenced');
+  assert.ok(INDEX_HTML.indexOf('assets/diagnostics_tech.jpg') !== -1, 'diagnostics_tech.jpg must be referenced');
+  assert.ok(INDEX_HTML.indexOf('assets/safety_badge.jpg') !== -1, 'safety_badge.jpg must be referenced');
+});
+
+test('index.html carries the Revolutions Automotive branding verbatim', function () {
+  assert.ok(INDEX_HTML.indexOf('Revolutions Automotive') !== -1);
+  assert.ok(INDEX_HTML.indexOf('1-15A Fisherman Dr, Brampton, ON L7A 1B7') !== -1);
+  assert.ok(INDEX_HTML.indexOf('(905) 846-8351') !== -1);
+});
+
+test('vehicle origin and class selects expose every engine option', function () {
+  ['domestic', 'asian_import', 'euro_import'].forEach(function (value) {
+    assert.ok(INDEX_HTML.indexOf('value="' + value + '"') !== -1, 'origin option missing: ' + value);
+  });
+  ['sedan', 'suv', 'truck'].forEach(function (value) {
+    assert.ok(INDEX_HTML.indexOf('value="' + value + '"') !== -1, 'class option missing: ' + value);
+  });
+  ['drop_off', 'wait_in_lounge'].forEach(function (value) {
+    assert.ok(INDEX_HTML.indexOf('value="' + value + '"') !== -1, 'booking mode option missing: ' + value);
+  });
+});
+
+test('coupon select exposes all 5 promo codes', function () {
+  ['SYNTH15', 'ALIGN25', 'DIAG50', 'BRAKE50', 'SAFETY10'].forEach(function (code) {
+    assert.ok(INDEX_HTML.indexOf('value="' + code + '"') !== -1, 'coupon option missing: ' + code);
+  });
 });
 
 /* ------------------------------------------------------------------ */
