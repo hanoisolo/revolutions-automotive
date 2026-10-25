@@ -727,6 +727,139 @@ test('coupon select exposes all 5 promo codes', function () {
 });
 
 /* ------------------------------------------------------------------ */
+/* Segment 3 Controller & Anti-Drift Tests                              */
+/* ------------------------------------------------------------------ */
+
+group('Segment 3 Controller & Anti-Drift');
+
+var APP_JS = fs.readFileSync('app.js', 'utf8');
+
+test('app.js exists and is a substantial controller (> 1000 chars)', function () {
+  assert.ok(APP_JS.length > 1000, 'app.js is only ' + APP_JS.length + ' chars');
+});
+
+test('anti-drift: every DOM ID referenced in app.js exists verbatim in index.html', function () {
+  var ids = [];
+  var reGetById = /getElementById\(\s*['"]([^'"]+)['"]\s*\)/g;
+  var reQuery = /querySelector(?:All)?\(\s*['"]#([A-Za-z0-9_-]+)['"]\s*\)/g;
+  var match;
+  while ((match = reGetById.exec(APP_JS)) !== null) ids.push(match[1]);
+  while ((match = reQuery.exec(APP_JS)) !== null) ids.push(match[1]);
+  assert.ok(ids.length >= 25, 'expected at least 25 DOM references in app.js, found ' + ids.length);
+  ids.forEach(function (id) {
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+      'app.js references missing DOM ID: #' + id);
+  });
+});
+
+test('engine integration: app.js wires the full RevolutionsEngine API', function () {
+  [
+    'RevolutionsEngine',
+    'calculateEstimate',
+    'validateBooking',
+    'recommendServicesBySymptoms',
+    'SERVICE_CATALOG',
+    'COUPON_CATALOG',
+    'SYMPTOM_CATALOG',
+    'SHOP_INFO'
+  ].forEach(function (token) {
+    assert.ok(APP_JS.indexOf(token) !== -1, 'app.js must use ' + token);
+  });
+});
+
+test('app.js persists state under the required localStorage key', function () {
+  assert.ok(APP_JS.indexOf('revolutions_automotive_state_v1') !== -1,
+    'app.js must use the revolutions_automotive_state_v1 storage key');
+  assert.ok(APP_JS.indexOf('localStorage') !== -1, 'app.js must use localStorage');
+});
+
+test('index.html loads app.js after the engine script and before closing body', function () {
+  var enginePos = INDEX_HTML.indexOf('<script src="revolutions_engine.js"></script>');
+  var appPos = INDEX_HTML.indexOf('<script src="app.js"></script>');
+  var bodyPos = INDEX_HTML.indexOf('</body>');
+  assert.ok(enginePos !== -1, 'engine script tag missing');
+  assert.ok(appPos !== -1, 'app.js script tag missing');
+  assert.ok(enginePos < appPos, 'app.js must load after revolutions_engine.js');
+  assert.ok(appPos < bodyPos, 'app.js must load before closing body');
+});
+
+test('sample scenario: engine output for the btn-load-sample inputs', function () {
+  var r = Engine.calculateEstimate({
+    serviceIds: ['brk_pads_rotors', 'tir_align_4whl', 'oil_full_synth'],
+    origin: 'asian_import',
+    vehicleClass: 'sedan',
+    couponCode: 'BRAKE50'
+  });
+  assert.strictEqual(r.serviceCount, 3);
+  assert.strictEqual(r.comboDiscountRate, 0.15);
+  assert.strictEqual(r.comboDiscountLow, 50.08);
+  assert.strictEqual(r.couponApplied, true);
+  assert.strictEqual(r.couponDiscount, 50);
+  assert.strictEqual(r.subtotalLow, 541.76);
+  assert.strictEqual(r.hstLow, 70.43);
+  assert.strictEqual(r.totalLow, 612.19);
+});
+
+test('sample booking payload validates with a wait-in-lounge advisory', function () {
+  var r = Engine.validateBooking({
+    customerName: 'Don Miller',
+    phone: '(905) 555-0149',
+    vehicleYear: '2021',
+    vehicleMake: 'Honda',
+    vehicleModel: 'Civic',
+    origin: 'asian_import',
+    vehicleClass: 'sedan',
+    serviceIds: ['brk_pads_rotors', 'tir_align_4whl', 'oil_full_synth'],
+    appointmentDate: '2026-10-27',
+    appointmentTime: '10:00',
+    bookingMode: 'wait_in_lounge'
+  });
+  assert.strictEqual(r.valid, true);
+  assert.deepStrictEqual(r.errors, []);
+  assert.ok(r.advisory, 'long job in lounge mode must produce an advisory');
+  assert.ok(r.advisory.indexOf('drop-off') !== -1);
+  assert.ok(/^REV-\d{8}-\d{4}-[A-Z]{2}\d{3}$/.test(r.confirmationCode));
+});
+
+test('app.js embeds the exact sample scenario data', function () {
+  [
+    'Don Miller',
+    '(905) 555-0149',
+    'BRAKE50',
+    'brk_pads_rotors',
+    'tir_align_4whl',
+    'oil_full_synth',
+    'Honda',
+    'Civic',
+    'asian_import',
+    'sedan',
+    'wait_in_lounge',
+    '10:00'
+  ].forEach(function (token) {
+    assert.ok(APP_JS.indexOf(token) !== -1, 'app.js sample scenario must include ' + token);
+  });
+});
+
+test('app.js renders every catalog surface the UI depends on', function () {
+  [
+    'symptom-chips',
+    'symptom-recommendations',
+    'category-filter-bar',
+    'service-grid',
+    'coupon-wallet-grid',
+    'coupon-select',
+    'estimate-summary-card'.replace('estimate-summary-card', 'est-total-range'),
+    'booking-form',
+    'booking-feedback',
+    'btn-load-sample'
+  ].forEach(function (id) {
+    assert.ok(APP_JS.indexOf(id) !== -1, 'app.js must render or wire #' + id);
+  });
+  assert.ok(APP_JS.indexOf('Add Recommended Services to Estimate') !== -1,
+    'symptom recommendations must offer an add button');
+});
+
+/* ------------------------------------------------------------------ */
 /* report                                                              */
 /* ------------------------------------------------------------------ */
 

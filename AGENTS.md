@@ -17,13 +17,16 @@
 .gitignore
 AGENTS.md
 revolutions_engine.js
-test_revolutions.js
+app.js
 index.html
 styles.css
+test_revolutions.js
 plans/
   prompt_stage2.txt
+  prompt_stage6.txt
   MASTER_ROADMAP.md
   ROADMAP.md
+  stage6_audit.md
 assets/
   hero_bay.jpg
   diagnostics_tech.jpg
@@ -46,6 +49,8 @@ any command.
 
 ## Current Status
 
-Stage 1 & Stage 2 complete. **Phase 1 — Segments 1 and 2 complete**
-(engine + tests 82/82 green; index.html, styles.css and 3 AI assets).
-**Phase 1 — Segment 3 pending** (app.js controller + anti-drift tests).
+**Phase 1 complete.** All 3 segments green:
+Segment 1 engine (68 tests), Segment 2 UI shell + assets (82 cumulative),
+Segment 3 controller + anti-drift (91 cumulative). Gate command:
+`node test_revolutions.js` (91/91 PASSED). Stage 6 Gemini 4 Argon audit:
+`AUDIT VERDICT: PASS` (plans/stage6_audit.md). **Phase 2 pending.**

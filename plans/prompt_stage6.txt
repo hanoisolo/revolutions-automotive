@@ -1,0 +1,66 @@
+You are Gemini 4 Argon, acting as the independent Stage 6 auditor for the
+Revolutions Automotive project. Conduct a strict code and assertion
+integrity audit of the attached files against the Phase 1 blueprint in
+plans/MASTER_ROADMAP.md.
+
+Attached files (in this order):
+1. revolutions_engine.js  - dual UMD estimation/booking/diagnostic engine
+2. index.html             - UI shell with the mandatory DOM ID contract
+3. styles.css             - industrial charcoal/crimson/gold styling
+4. app.js                 - interactive controller (localStorage state)
+5. test_revolutions.js    - headless Node assert suite (91 tests)
+
+Audit strictly against the Phase 1 requirements:
+
+1. Mathematical & domain precision:
+   - Ontario 13% HST applied to the post-discount subtotal, rounded to
+     2 decimals with half-up behavior.
+   - Multi-service shared-hoist combo labor discount: 10% off labor for
+     exactly 2 selected services, 15% off labor for 3+ services.
+   - Shop supplies & environmental fee at 5% of post-discount labor,
+     strictly capped at $35.00 CAD, computed per low/high range.
+   - Vehicle origin multipliers (domestic 1.00, asian_import 1.08 parts /
+     1.05 labor, euro_import 1.25 / 1.20) and class multipliers
+     (sedan 1.00, suv 1.12 / 1.10, truck 1.20 / 1.18) applied to both
+     parts and labor.
+   - Coupon rules: SYNTH15 ($15 off oil change), ALIGN25 ($25 off alignment
+     only with tire/suspension service), DIAG50 (50% off diagnostic labor
+     only when paired with a repair), BRAKE50 ($50 off brake job, $250
+     minimum spend), SAFETY10 ($10 off MTO SSC).
+   - Brampton shop hours validation in validateBooking: Mon-Fri 8:00 AM
+     to 5:30 PM last check-in (closes 6:00 PM), Saturday 8:30 AM to 2:30
+     PM last check-in (closes 3:00 PM), Sunday closed; 10-digit phone;
+     vehicle year 1980-2027; drop_off / wait_in_lounge with a drop-off
+     advisory above 3.0 estimated hours.
+
+2. Assertion integrity:
+   - Confirm that NO prior Segment 1 (68 tests) or Segment 2 (14 tests)
+     assertions were weakened, commented out, broadened, or removed.
+     Segment 3 must only append tests.
+   - Confirm the anti-drift check genuinely extracts every
+     document.getElementById('...') / querySelector('#...') /
+     querySelectorAll('#...') ID from app.js and asserts each exists
+     verbatim in index.html.
+
+3. DOM wiring and anti-drift compliance:
+   - app.js wires vehicle selectors, symptom chips + recommendations with
+     an "Add Recommended Services to Estimate" button, category filter,
+     12-service grid, coupon wallet synced with #coupon-select, the live
+     estimate card (#est-parts, #est-labor, #est-combo-discount,
+     #est-shop-supplies, #est-discount, #est-coupon-status,
+     #est-subtotal, #est-hst, #est-total-range, #est-selected-count,
+     #est-line-items), the booking form with inline feedback, and
+     #btn-load-sample (2021 Honda Civic, asian_import sedan, brake job +
+     4-wheel alignment + synthetic oil change, BRAKE50, Don Miller,
+     (905) 555-0149, next Tuesday 10:00, wait_in_lounge).
+   - State persists under localStorage key revolutions_automotive_state_v1.
+   - index.html loads revolutions_engine.js then app.js before </body>.
+
+Output format: pure Markdown. Audit each numbered area, cite specific
+evidence (function names, test names, line-level facts), then conclude
+with EXACTLY one line at the end of the document, one of:
+AUDIT VERDICT: PASS
+or
+AUDIT VERDICT: FAIL
+If the verdict is FAIL, precede it with actionable remediation bullet
+points. Do not output anything after the verdict line.
