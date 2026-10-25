@@ -609,3 +609,374 @@ input:focus, select:focus, button:focus-visible {
   .showcase-card-reverse .showcase-img { order: 0; }
   .masthead { justify-content: center; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Phase 2: Diagnostic wizard                                           */
+/* ------------------------------------------------------------------ */
+
+.wizard-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--crimson);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.wizard-step-indicator {
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold-bright);
+  border: 1px dashed var(--gold);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.06);
+  padding: 0.55rem 0.9rem;
+}
+
+.wizard-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+
+.wizard-option {
+  font-family: var(--font);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: left;
+  color: var(--text-primary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  min-height: 3rem;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease;
+}
+
+.wizard-option:hover { border-color: var(--gold); transform: translateY(-2px); }
+
+.wizard-result-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 1.1rem 1.25rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.wizard-result-card[hidden] { display: none; }
+
+.btn-wizard-cta {
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  color: #201500;
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+  justify-self: start;
+}
+
+.triage-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  border: 1px solid transparent;
+}
+
+.triage-tow_now {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.2);
+  border-color: var(--crimson);
+  animation: triage-pulse 1.6s ease-in-out infinite;
+}
+
+.triage-schedule_urgent {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.18);
+  border-color: var(--gold);
+}
+
+.triage-routine_inspect {
+  color: #bfdbfe;
+  background: rgba(59, 130, 246, 0.16);
+  border-color: #3b82f6;
+}
+
+.wizard-cause-list { margin: 0; padding-left: 1.1rem; color: var(--text-muted); font-size: 0.9rem; }
+
+.wizard-tech-notes { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+
+@keyframes triage-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 2: Ontario MTO safety pre-check                               */
+/* ------------------------------------------------------------------ */
+
+.safety-layout {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.safety-checklist-container { display: grid; gap: 0.7rem; }
+
+.safety-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.safety-item-text { flex: 1 1 320px; }
+.safety-item-title { font-size: 0.95rem; font-weight: 700; margin: 0; }
+.safety-item-title .sev-critical { color: var(--crimson); }
+.safety-item-title .sev-major { color: var(--gold-bright); }
+.safety-item-title .sev-minor { color: var(--text-muted); }
+.safety-item-question { color: var(--text-muted); font-size: 0.82rem; margin: 0.15rem 0 0; }
+
+.safety-toggle-group { display: flex; gap: 0.4rem; }
+
+.safety-toggle {
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: var(--bg-800);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  min-width: 3.2rem;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.safety-toggle.toggle-pass.active {
+  color: #062b1c;
+  background: var(--emerald);
+  border-color: var(--emerald);
+}
+
+.safety-toggle.toggle-fail.active {
+  color: #fff;
+  background: var(--crimson);
+  border-color: var(--crimson);
+}
+
+.safety-toggle.toggle-unsure.active {
+  color: #201500;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.safety-verdict {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.safety-score-gauge {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  border-radius: var(--radius);
+  border: 2px solid var(--border);
+  padding: 1.4rem 1rem;
+  background:
+    radial-gradient(closest-side, var(--surface-2) 79%, transparent 80% 100%),
+    conic-gradient(var(--gold) 0%, var(--surface-2) 0);
+}
+
+.safety-score-gauge.is-pass { border-color: var(--emerald); }
+.safety-score-gauge.is-advisory { border-color: var(--gold); }
+.safety-score-gauge.is-fail { border-color: var(--crimson); }
+
+.gauge-percent { font-size: 2.3rem; font-weight: 800; color: var(--gold-bright); }
+.safety-score-gauge.is-pass .gauge-percent { color: var(--emerald); }
+.safety-score-gauge.is-fail .gauge-percent { color: var(--crimson); }
+.gauge-label { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-muted); }
+
+.safety-summary-alert {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--gold);
+  background: rgba(245, 158, 11, 0.08);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.88rem;
+  min-height: 1.5rem;
+}
+
+.safety-summary-alert.is-pass {
+  border-color: var(--emerald);
+  border-left-color: var(--emerald);
+  background: rgba(16, 185, 129, 0.1);
+  color: #a7f3d0;
+}
+
+.safety-summary-alert.is-advisory {
+  border-color: var(--gold);
+  border-left-color: var(--gold);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fde68a;
+}
+
+.safety-summary-alert.is-fail {
+  border-color: var(--crimson);
+  border-left-color: var(--crimson);
+  background: rgba(220, 38, 38, 0.14);
+  color: #fecaca;
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 2: Live repair bay & work order tracker                        */
+/* ------------------------------------------------------------------ */
+
+.tracker-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.tracker-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.9rem;
+  align-items: end;
+}
+
+.tracker-field { display: grid; gap: 0.3rem; }
+
+.btn-track { white-space: nowrap; }
+
+.tracker-samples { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+.btn-sample-alt {
+  background: var(--surface-2);
+  color: var(--gold-bright);
+  border: 1px dashed var(--gold);
+  font-size: 0.85rem;
+}
+
+.tracker-feedback { font-size: 0.9rem; }
+.tracker-feedback:empty { display: none; }
+
+.tracker-status-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
+}
+
+.tl-step {
+  position: relative;
+  text-align: center;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 1.5rem 0.35rem 0.35rem;
+  border-radius: 8px;
+  background: var(--bg-800);
+  border: 1px solid var(--border);
+}
+
+.tl-step::before {
+  content: "";
+  position: absolute;
+  top: 0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.tl-step.is-complete { color: #a7f3d0; }
+.tl-step.is-complete::before { background: var(--emerald); }
+
+.tl-step.is-active {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  animation: bay-pulse 1.8s ease-in-out infinite;
+}
+
+.tl-step.is-active::before {
+  background: linear-gradient(135deg, var(--gold), var(--crimson));
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.8);
+}
+
+.tl-step.is-pending { color: var(--text-muted); opacity: 0.75; }
+
+@keyframes bay-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  50% { box-shadow: 0 0 14px 2px rgba(245, 158, 11, 0.45); }
+}
+
+.tracker-technician-notes {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg-800);
+  padding: 0.9rem 1.1rem;
+  font-size: 0.88rem;
+  min-height: 1.5rem;
+}
+
+.tracker-technician-notes:empty { display: none; }
+
+.tracker-notes-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold-bright);
+  margin: 0 0 0.3rem;
+}
+
+.tracker-notes-meta { color: var(--text-muted); margin: 0 0 0.3rem; }
+.tracker-notes-meta strong { color: var(--text-primary); }
+
+/* ------------------------------------------------------------------ */
+/* Phase 2: Responsive additions                                       */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 1024px) {
+  .safety-layout { grid-template-columns: 1fr; }
+  .safety-verdict { position: static; }
+}
+
+@media (max-width: 720px) {
+  .tracker-form { grid-template-columns: 1fr; }
+  .tracker-status-timeline { grid-template-columns: 1fr; }
+  .tl-step { text-align: left; padding: 0.55rem 0.7rem 0.55rem 2.4rem; }
+  .tl-step::before { top: 50%; left: 0.85rem; transform: translateY(-50%); }
+}

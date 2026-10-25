@@ -843,6 +843,1113 @@
     };
   }
 
+  /* ================================================================== */
+  /* Phase 2 - Segment 1: Diagnostic wizard, Ontario MTO safety        */
+  /* pre-check and live bay tracker engine extensions.                 */
+  /* ================================================================== */
+
+  function deepFreeze(value) {
+    if (value && typeof value === 'object') {
+      Object.getOwnPropertyNames(value).forEach(function (key) {
+        deepFreeze(value[key]);
+      });
+      Object.freeze(value);
+    }
+    return value;
+  }
+
+  var DIAGNOSTIC_DECISION_TREE = deepFreeze({
+    rootNodeId: 'step_anomaly',
+    nodes: {
+      step_anomaly: {
+        id: 'step_anomaly',
+        type: 'question',
+        stepNumber: 1,
+        answerKey: 'anomaly',
+        prompt: 'What kind of anomaly is your vehicle exhibiting?',
+        options: [
+          { value: 'sound', label: 'A noise I can hear', nextNodeId: 'step_location_sound' },
+          { value: 'vibration', label: 'A vibration or shake I can feel', nextNodeId: 'step_location_vibration' },
+          { value: 'warning_light', label: 'A dashboard warning light', nextNodeId: 'step_location_warning' },
+          { value: 'smell', label: 'An unusual smell', nextNodeId: 'step_location_smell' },
+          { value: 'fluid_leak', label: 'A fluid leak or puddle', nextNodeId: 'step_location_fluid' }
+        ]
+      },
+
+      step_location_sound: {
+        id: 'step_location_sound',
+        type: 'question',
+        stepNumber: 2,
+        answerKey: 'location',
+        prompt: 'Where is the noise coming from?',
+        options: [
+          { value: 'wheels_or_brakes', label: 'Around the wheels or when braking', nextNodeId: 'step_condition_sound_brakes' },
+          { value: 'engine_bay', label: 'From the engine bay', nextNodeId: 'step_condition_sound_engine' },
+          { value: 'under_vehicle_exhaust', label: 'Under the vehicle or from the exhaust', nextNodeId: 'step_condition_sound_exhaust' }
+        ]
+      },
+      step_condition_sound_brakes: {
+        id: 'step_condition_sound_brakes',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'Which condition best matches the noise?',
+        options: [
+          { value: 'squeal_when_braking', label: 'High-pitched squeal when braking', nextNodeId: 'term_squeal_brakes' },
+          { value: 'grind_when_braking', label: 'Metal-on-metal grinding when braking', nextNodeId: 'term_grind_brakes' },
+          { value: 'clunk_over_bumps', label: 'Clunking over bumps or potholes', nextNodeId: 'term_clunk_suspension' }
+        ]
+      },
+      step_condition_sound_engine: {
+        id: 'step_condition_sound_engine',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'Which condition best matches the noise?',
+        options: [
+          { value: 'knocking_or_ticking', label: 'Knocking or ticking from the engine', nextNodeId: 'term_knock_tick' },
+          { value: 'hissing_or_whistling', label: 'Hissing or whistling at idle', nextNodeId: 'term_vacuum_hiss' },
+          { value: 'rattle_on_acceleration', label: 'Rattling on acceleration', nextNodeId: 'term_exhaust_rattle' }
+        ]
+      },
+      step_condition_sound_exhaust: {
+        id: 'step_condition_sound_exhaust',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'Which condition best matches the noise?',
+        options: [
+          { value: 'roar_under_floor', label: 'Loud roar under the floor while driving', nextNodeId: 'term_exhaust_roar' },
+          { value: 'boom_on_start', label: 'Boom or rumble on start-up', nextNodeId: 'term_exhaust_boom' }
+        ]
+      },
+
+      step_location_vibration: {
+        id: 'step_location_vibration',
+        type: 'question',
+        stepNumber: 2,
+        answerKey: 'location',
+        prompt: 'Where do you feel the vibration?',
+        options: [
+          { value: 'steering_wheel', label: 'In the steering wheel', nextNodeId: 'step_condition_vibration_steering' },
+          { value: 'seat_or_floor', label: 'In the seat or floor', nextNodeId: 'step_condition_vibration_floor' },
+          { value: 'brake_pedal', label: 'In the brake pedal', nextNodeId: 'step_condition_vibration_pedal' }
+        ]
+      },
+      step_condition_vibration_steering: {
+        id: 'step_condition_vibration_steering',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'Which condition best matches the vibration?',
+        options: [
+          { value: 'shakes_when_braking', label: 'Steering wheel shakes when braking', nextNodeId: 'term_pulsating_brakes' },
+          { value: 'shakes_at_highway_speed', label: 'Shakes at highway speed (80-100 km/h)', nextNodeId: 'term_high_speed_shimmy' }
+        ]
+      },
+      step_condition_vibration_floor: {
+        id: 'step_condition_vibration_floor',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'Which condition best matches the vibration?',
+        options: [
+          { value: 'hum_grows_with_speed', label: 'Hum that grows with speed', nextNodeId: 'term_wheel_bearing_hum' },
+          { value: 'bounces_over_bumps', label: 'Bounces and floats over bumps', nextNodeId: 'term_worn_struts' }
+        ]
+      },
+      step_condition_vibration_pedal: {
+        id: 'step_condition_vibration_pedal',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'Which condition best matches the vibration?',
+        options: [
+          { value: 'pulsates_when_braking', label: 'Pedal pulsates up and down when braking', nextNodeId: 'term_pedal_pulsation' },
+          { value: 'vibrates_constantly', label: 'Pedal vibrates constantly while driving', nextNodeId: 'term_pedal_vibration' }
+        ]
+      },
+
+      step_location_warning: {
+        id: 'step_location_warning',
+        type: 'question',
+        stepNumber: 2,
+        answerKey: 'location',
+        prompt: 'Which warning light or gauge is involved?',
+        options: [
+          { value: 'check_engine', label: 'Check Engine light', nextNodeId: 'step_condition_warning_cel' },
+          { value: 'red_oil_or_temp', label: 'Red oil pressure or temperature light', nextNodeId: 'step_condition_warning_red' },
+          { value: 'abs_or_traction', label: 'ABS or Traction Control light', nextNodeId: 'step_condition_warning_abs' },
+          { value: 'battery_charging', label: 'Battery or Charging light', nextNodeId: 'step_condition_warning_battery' }
+        ]
+      },
+      step_condition_warning_cel: {
+        id: 'step_condition_warning_cel',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'How is the Check Engine light behaving?',
+        options: [
+          { value: 'flashing', label: 'Flashing while driving', nextNodeId: 'term_flashing_cel' },
+          { value: 'solid', label: 'Solid and the vehicle drives normally', nextNodeId: 'term_solid_cel' }
+        ]
+      },
+      step_condition_warning_red: {
+        id: 'step_condition_warning_red',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'How is the gauge or light behaving?',
+        options: [
+          { value: 'gauge_in_red_zone', label: 'Gauge in the red zone or steam from the hood', nextNodeId: 'term_overheat_tow' },
+          { value: 'gauge_climbing', label: 'Gauge climbing above normal but not in the red', nextNodeId: 'term_overheat_early' }
+        ]
+      },
+      step_condition_warning_abs: {
+        id: 'step_condition_warning_abs',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'How is the ABS or Traction light behaving?',
+        options: [
+          { value: 'with_grinding_or_noise', label: 'On together with brake noise or grinding', nextNodeId: 'term_abs_with_noise' },
+          { value: 'intermittent_or_alone', label: 'Intermittent or on by itself', nextNodeId: 'term_abs_scan' }
+        ]
+      },
+      step_condition_warning_battery: {
+        id: 'step_condition_warning_battery',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'How is the electrical system behaving?',
+        options: [
+          { value: 'light_while_driving', label: 'Battery light on while driving', nextNodeId: 'term_alternator_fault' },
+          { value: 'dead_overnight', label: 'Battery dead in the morning', nextNodeId: 'term_parasitic_draw' }
+        ]
+      },
+
+      step_location_smell: {
+        id: 'step_location_smell',
+        type: 'question',
+        stepNumber: 2,
+        answerKey: 'location',
+        prompt: 'Where is the smell strongest?',
+        options: [
+          { value: 'exhaust_fumes_in_cabin', label: 'Exhaust fumes inside the cabin', nextNodeId: 'step_condition_smell_exhaust' },
+          { value: 'burning_odor', label: 'A burning odour', nextNodeId: 'step_condition_smell_burning' }
+        ]
+      },
+      step_condition_smell_exhaust: {
+        id: 'step_condition_smell_exhaust',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'When do you notice the fumes?',
+        options: [
+          { value: 'fumes_while_driving', label: 'While driving or idling', nextNodeId: 'term_exhaust_fumes_cabin' },
+          { value: 'fumes_on_cold_start', label: 'Only on cold start-up', nextNodeId: 'term_cold_start_rich' }
+        ]
+      },
+      step_condition_smell_burning: {
+        id: 'step_condition_smell_burning',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'Which burning odour best matches?',
+        options: [
+          { value: 'after_hard_braking', label: 'After hard braking', nextNodeId: 'term_seized_caliper' },
+          { value: 'burning_oil', label: 'Burning oil smell from the engine', nextNodeId: 'term_oil_burn_smell' },
+          { value: 'electrical_or_plastic', label: 'Electrical or burning plastic', nextNodeId: 'term_electrical_burn' }
+        ]
+      },
+
+      step_location_fluid: {
+        id: 'step_location_fluid',
+        type: 'question',
+        stepNumber: 2,
+        answerKey: 'location',
+        prompt: 'Where is the puddle or leak?',
+        options: [
+          { value: 'under_front_wheel_area', label: 'Under a front wheel area', nextNodeId: 'step_condition_fluid_front' },
+          { value: 'under_engine', label: 'Under the middle of the engine', nextNodeId: 'step_condition_fluid_engine' },
+          { value: 'under_vehicle_middle', label: 'Under the middle or rear of the vehicle', nextNodeId: 'step_condition_fluid_middle' }
+        ]
+      },
+      step_condition_fluid_front: {
+        id: 'step_condition_fluid_front',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'Which condition best matches the leak?',
+        options: [
+          { value: 'slick_reddish_fluid', label: 'Slick reddish fluid near the steering', nextNodeId: 'term_ps_leak' },
+          { value: 'low_brake_fluid_warning', label: 'Brake fluid warning or a sinking pedal', nextNodeId: 'term_brake_fluid_leak' }
+        ]
+      },
+      step_condition_fluid_engine: {
+        id: 'step_condition_fluid_engine',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'What does the leaked fluid look like?',
+        options: [
+          { value: 'brown_or_black_oil', label: 'Brown or black oily fluid', nextNodeId: 'term_engine_oil_leak' },
+          { value: 'bright_green_or_pink', label: 'Bright green or pink fluid', nextNodeId: 'term_coolant_leak' }
+        ]
+      },
+      step_condition_fluid_middle: {
+        id: 'step_condition_fluid_middle',
+        type: 'question',
+        stepNumber: 3,
+        answerKey: 'condition',
+        prompt: 'What does the leaked fluid look like?',
+        options: [
+          { value: 'clear_water', label: 'Clear water, mostly on hot days', nextNodeId: 'term_ac_condensate' },
+          { value: 'dark_heavy_oil', label: 'Dark, thick, heavy oil', nextNodeId: 'term_gearbox_leak' }
+        ]
+      },
+
+      term_squeal_brakes: {
+        id: 'term_squeal_brakes',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Pad wear indicator tab contacting the rotor face',
+          'Glazed or lightly scored friction material'
+        ],
+        serviceId: 'brk_pads_rotors',
+        technicianNotes: 'Measure remaining pad lining in mm and inspect rotor surface finish before any replacement.'
+      },
+      term_grind_brakes: {
+        id: 'term_grind_brakes',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Friction material fully consumed - steel backing plate on the rotor',
+          'Scored or heat-cracked rotors from continued driving'
+        ],
+        serviceId: 'brk_pads_rotors',
+        technicianNotes: 'Stop driving: replace pads and rotors, service caliper hardware and road test before returning the vehicle.'
+      },
+      term_clunk_suspension: {
+        id: 'term_clunk_suspension',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Worn ball joints or stabilizer bar links',
+          'Fatigued strut mounts or control arm bushings'
+        ],
+        serviceId: 'sus_strut_control',
+        technicianNotes: 'Perform a hoist inspection of ball joints, stabilizer links and strut mounts with a pry-bar and dial indicator.'
+      },
+      term_knock_tick: {
+        id: 'term_knock_tick',
+        type: 'terminal',
+        triageLevel: 'tow_now',
+        rootCauses: [
+          'Internal engine knock from bearing or piston wear',
+          'Low oil pressure starving the valvetrain'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'CRITICAL: internal engine knock risks catastrophic failure. Tow in for an oil pressure test and internal inspection.'
+      },
+      term_vacuum_hiss: {
+        id: 'term_vacuum_hiss',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Vacuum or intake manifold leak',
+          'Failing PCV valve or loose booster hose connection'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'Smoke-test the intake for vacuum leaks and run an OBD-II fuel trim analysis to pinpoint the leak.'
+      },
+      term_exhaust_rattle: {
+        id: 'term_exhaust_rattle',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Loose heat shield or failed exhaust hanger',
+          'Corroded flex pipe joint rattling under load'
+        ],
+        serviceId: 'mto_safety_exhaust',
+        technicianNotes: 'Hoist the vehicle and secure or replace the failed heat shield, hanger or flex section.'
+      },
+      term_exhaust_roar: {
+        id: 'term_exhaust_roar',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Perforated muffler or detached pipe joint',
+          'Broken exhaust manifold gasket seal'
+        ],
+        serviceId: 'mto_safety_exhaust',
+        technicianNotes: 'Smoke-test the exhaust path from manifold to tailpipe and replace the perforated or detached section.'
+      },
+      term_exhaust_boom: {
+        id: 'term_exhaust_boom',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Damaged muffler baffle resonance',
+          'Loose tailpipe vibrating on start-up'
+        ],
+        serviceId: 'mto_safety_exhaust',
+        technicianNotes: 'Inspect the muffler baffle and tailpipe mounts; repair the resonating section.'
+      },
+      term_pulsating_brakes: {
+        id: 'term_pulsating_brakes',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Disc thickness variation (warped rotors)',
+          'Uneven pad transfer film on the rotor face'
+        ],
+        serviceId: 'brk_pads_rotors',
+        technicianNotes: 'Measure rotor disc thickness variation and runout with a micrometer; resurface or replace rotors as needed.'
+      },
+      term_high_speed_shimmy: {
+        id: 'term_high_speed_shimmy',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Lost wheel weight or dynamic wheel imbalance',
+          'Bent rim or out-of-round tire'
+        ],
+        serviceId: 'tir_mount_balance',
+        technicianNotes: 'Road-force balance all four wheels and check rims for runout and tire uniformity.'
+      },
+      term_wheel_bearing_hum: {
+        id: 'term_wheel_bearing_hum',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Worn wheel bearing growl that rises with speed',
+          'Uneven tire cupping mimicking a bearing noise'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'Road test with chassis ears to isolate the worn bearing, then replace the hub assembly.'
+      },
+      term_worn_struts: {
+        id: 'term_worn_struts',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Blown struts or shock absorbers losing damping',
+          'Broken coil spring or collapsed strut mount'
+        ],
+        serviceId: 'sus_strut_control',
+        technicianNotes: 'Perform a bounce test and hoist inspection; replace blown struts or shocks in pairs.'
+      },
+      term_pedal_pulsation: {
+        id: 'term_pedal_pulsation',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Rotor runout beyond factory specification',
+          'Hot spots from deposited friction material'
+        ],
+        serviceId: 'brk_pads_rotors',
+        technicianNotes: 'Measure pedal pulsation against rotor runout spec; replace rotors and the pad set on the affected axle.'
+      },
+      term_pedal_vibration: {
+        id: 'term_pedal_vibration',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Seized or dragging caliper slide pins',
+          'Contaminated or aerated brake fluid'
+        ],
+        serviceId: 'brk_fluid_caliper',
+        technicianNotes: 'Inspect caliper slide pins for seizure and test brake fluid condition and moisture content.'
+      },
+      term_flashing_cel: {
+        id: 'term_flashing_cel',
+        type: 'terminal',
+        triageLevel: 'tow_now',
+        rootCauses: [
+          'Active catalyst-damaging cylinder misfire',
+          'Critical fuel, ignition or injector fault'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'CRITICAL STOP-DRIVE: a flashing MIL means raw fuel is entering the catalytic converter. Tow in for an OEM scan.'
+      },
+      term_solid_cel: {
+        id: 'term_solid_cel',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Stored emissions or sensor fault code',
+          'EVAP purge solenoid or oxygen sensor drift'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'Perform a full OBD-II scan with freeze-frame analysis before recommending any repair.'
+      },
+      term_overheat_tow: {
+        id: 'term_overheat_tow',
+        type: 'terminal',
+        triageLevel: 'tow_now',
+        rootCauses: [
+          'Stuck-closed thermostat or failed cooling fan',
+          'Coolant loss from the water pump, radiator or a hose'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'CRITICAL THERMAL RISK: continued operation risks head gasket failure. Tow in for a cooling system pressure test.'
+      },
+      term_overheat_early: {
+        id: 'term_overheat_early',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Weak water pump impeller or restricted radiator',
+          'Depleted coolant or a failing radiator cap'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'Pressure-test the cooling system, verify fan and thermostat function before the gauge reaches red.'
+      },
+      term_abs_with_noise: {
+        id: 'term_abs_with_noise',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'ABS wheel speed sensor contaminated by brake dust',
+          'Worn brakes triggering ABS and traction warnings'
+        ],
+        serviceId: 'brk_pads_rotors',
+        technicianNotes: 'Inspect brake wear and wheel speed sensors; clean or replace contaminated ABS tone rings.'
+      },
+      term_abs_scan: {
+        id: 'term_abs_scan',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Intermittent wheel speed sensor signal',
+          'ABS module code stored without an active brake fault'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'Scan ABS and traction modules for stored codes and perform a wheel speed sensor signal test.'
+      },
+      term_alternator_fault: {
+        id: 'term_alternator_fault',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Alternator voltage regulator failure',
+          'Slipped or glazed serpentine belt on the pulley'
+        ],
+        serviceId: 'diag_elec_parasitic',
+        technicianNotes: 'Perform a charging system load test (AVR) and inspect the serpentine belt and tensioner.'
+      },
+      term_parasitic_draw: {
+        id: 'term_parasitic_draw',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Key-off parasitic draw above 50 mA',
+          'Aged battery with a dead cell or sulfation'
+        ],
+        serviceId: 'diag_elec_parasitic',
+        technicianNotes: 'Perform an amp-clamp parasitic draw test across the fuse blocks and a battery conductance test.'
+      },
+      term_exhaust_fumes_cabin: {
+        id: 'term_exhaust_fumes_cabin',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Exhaust leak forward of the cabin air intake - CO intrusion risk',
+          'Perforated downpipe or manifold gasket leak'
+        ],
+        serviceId: 'mto_safety_exhaust',
+        technicianNotes: 'CO INTRUSION HAZARD: locate the exhaust leak with a smoke test and repair it before driving again.'
+      },
+      term_cold_start_rich: {
+        id: 'term_cold_start_rich',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Rich fuel mixture on cold start (cold-start enrichment)',
+          'Leaking injector or faulty engine temperature sensor'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'Scan for rich-mixture codes, test the engine coolant temperature sensor and inspect injector spray.'
+      },
+      term_seized_caliper: {
+        id: 'term_seized_caliper',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Seized caliper dragging the pads against the rotor',
+          'Boiled brake fluid from sustained heat'
+        ],
+        serviceId: 'brk_pads_rotors',
+        technicianNotes: 'Inspect the dragging caliper, service or replace it, and flush the heat-cycled brake fluid.'
+      },
+      term_oil_burn_smell: {
+        id: 'term_oil_burn_smell',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Engine oil leaking onto hot exhaust surfaces',
+          'Overfilled or degraded engine oil burning off'
+        ],
+        serviceId: 'oil_full_synth',
+        technicianNotes: 'Degrease and trace the oil leak source; repair the gasket or seal leaking onto the exhaust.'
+      },
+      term_electrical_burn: {
+        id: 'term_electrical_burn',
+        type: 'terminal',
+        triageLevel: 'tow_now',
+        rootCauses: [
+          'Shorted wiring harness or melting connector',
+          'Failed blower motor resistor or seized fan motor'
+        ],
+        serviceId: 'diag_elec_parasitic',
+        technicianNotes: 'CRITICAL FIRE RISK: isolate the shorted circuit, inspect the harness and connector, and repair before driving.'
+      },
+      term_ps_leak: {
+        id: 'term_ps_leak',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Power steering rack or pressure hose leak at the front wheels',
+          'Worn steering rack seals'
+        ],
+        serviceId: 'sus_strut_control',
+        technicianNotes: 'Pressure-test the power steering system; replace the leaking hose, rack seal or pump as required.'
+      },
+      term_brake_fluid_leak: {
+        id: 'term_brake_fluid_leak',
+        type: 'terminal',
+        triageLevel: 'tow_now',
+        rootCauses: [
+          'Leaking wheel cylinder, caliper or brake line',
+          'Master cylinder reservoir dropping below minimum'
+        ],
+        serviceId: 'brk_pads_rotors',
+        technicianNotes: 'CRITICAL SAFETY HAZARD: loss of hydraulic brake pressure. Tow in; repair the leaking line, caliper or master cylinder.'
+      },
+      term_engine_oil_leak: {
+        id: 'term_engine_oil_leak',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Valve cover or oil pan gasket seepage',
+          'Timing cover or crank seal leak'
+        ],
+        serviceId: 'oil_full_synth',
+        technicianNotes: 'Degrease the engine, trace the seepage from the valve cover or oil pan gasket and reseal.'
+      },
+      term_coolant_leak: {
+        id: 'term_coolant_leak',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Water pump weep hole or radiator seam leak',
+          'Bypass hose or thermostat housing leak'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'Pressure-test the cooling system to pinpoint the water pump, hose or radiator leak.'
+      },
+      term_ac_condensate: {
+        id: 'term_ac_condensate',
+        type: 'terminal',
+        triageLevel: 'routine_inspect',
+        rootCauses: [
+          'Normal A/C evaporator condensate drip (harmless)',
+          'Verify the evaporator drain tube position before any repair'
+        ],
+        serviceId: 'ac_evac_recharge',
+        technicianNotes: 'Verify the puddle is clear water from the A/C evaporator drain - a normal condition; inspect if coolant is suspected.'
+      },
+      term_gearbox_leak: {
+        id: 'term_gearbox_leak',
+        type: 'terminal',
+        triageLevel: 'schedule_urgent',
+        rootCauses: [
+          'Transmission or differential output shaft seal leak',
+          'Overfilled gear oil pushed through a vent'
+        ],
+        serviceId: 'diag_computer_scan',
+        technicianNotes: 'Identify the fluid type, then reseal the transmission or differential output shaft leaking gear oil.'
+      }
+    }
+  });
+
+  var TRIAGE_URGENCY = Object.freeze({
+    tow_now: 'Do not drive - arrange a tow to the shop immediately.',
+    schedule_urgent: 'Book an appointment within 24-48 hours.',
+    routine_inspect: 'Book at your earliest convenience.'
+  });
+
+  /*
+   * evaluateDiagnosticWizard(answersObject)
+   * answersObject: {
+   *   anomaly: 'sound' | 'vibration' | 'warning_light' | 'smell' | 'fluid_leak',
+   *   location: '<option value at step 2>',
+   *   condition: '<option value at step 3>'
+   * }
+   * Also accepts { terminalNodeId } / { nodeId } for direct terminal lookup and
+   * emergency overrides (flashingWarningLight / brakeFailure / overheating).
+   * Returns { triageLevel, rootCauses, serviceId, technicianNotes, recommendedUrgency }.
+   */
+  var WIZARD_FALLBACK_CAUSES = Object.freeze([
+    'Requires hands-on hoist and OBD-II computer diagnostic inspection to isolate root cause'
+  ]);
+
+  function wizardFallbackResult() {
+    return {
+      triageLevel: 'routine_inspect',
+      rootCauses: WIZARD_FALLBACK_CAUSES.slice(),
+      serviceId: 'diag_computer_scan',
+      technicianNotes: 'Customer symptom selection incomplete or general; perform baseline computer diagnostic scan and road test.',
+      recommendedUrgency: TRIAGE_URGENCY.routine_inspect
+    };
+  }
+
+  function wizardTerminalResult(terminal) {
+    return {
+      triageLevel: terminal.triageLevel,
+      rootCauses: terminal.rootCauses.slice(),
+      serviceId: terminal.serviceId,
+      technicianNotes: terminal.technicianNotes,
+      recommendedUrgency: TRIAGE_URGENCY[terminal.triageLevel] || TRIAGE_URGENCY.routine_inspect
+    };
+  }
+
+  function evaluateDiagnosticWizard(answersObject) {
+    if (!answersObject || typeof answersObject !== 'object') {
+      return wizardFallbackResult();
+    }
+
+    var nodes = DIAGNOSTIC_DECISION_TREE.nodes;
+
+    if (typeof answersObject.terminalNodeId === 'string' &&
+        nodes[answersObject.terminalNodeId] &&
+        nodes[answersObject.terminalNodeId].type === 'terminal') {
+      return wizardTerminalResult(nodes[answersObject.terminalNodeId]);
+    }
+    if (typeof answersObject.nodeId === 'string' &&
+        nodes[answersObject.nodeId] &&
+        nodes[answersObject.nodeId].type === 'terminal') {
+      return wizardTerminalResult(nodes[answersObject.nodeId]);
+    }
+    if (answersObject.flashingWarningLight === true) return wizardTerminalResult(nodes.term_flashing_cel);
+    if (answersObject.brakeFailure === true) return wizardTerminalResult(nodes.term_brake_fluid_leak);
+    if (answersObject.overheating === true) return wizardTerminalResult(nodes.term_overheat_tow);
+
+    var currentId = DIAGNOSTIC_DECISION_TREE.rootNodeId;
+    for (var hop = 0; hop < 8; hop++) {
+      var node = nodes[currentId];
+      if (!node) return wizardFallbackResult();
+      if (node.type === 'terminal') return wizardTerminalResult(node);
+      var answer = answersObject[node.answerKey];
+      if (typeof answer !== 'string') return wizardFallbackResult();
+      var next = null;
+      for (var i = 0; i < node.options.length; i++) {
+        if (node.options[i].value === answer) {
+          next = node.options[i].nextNodeId;
+          break;
+        }
+      }
+      if (!next) return wizardFallbackResult();
+      currentId = next;
+    }
+    return wizardFallbackResult();
+  }
+
+  var MTO_SSC_CHECKLIST_ITEMS = deepFreeze([
+    {
+      id: 'mto_brakes',
+      areaLabel: 'Brakes & Hydraulic System',
+      question: 'Does the vehicle stop straight and firmly without grinding, a brake warning light, or a soft pedal?',
+      weight: 15,
+      severity: 'critical',
+      recommendedServiceId: 'brk_pads_rotors'
+    },
+    {
+      id: 'mto_steering',
+      areaLabel: 'Front Steering & Linkage',
+      question: 'Is the steering tight and responsive without clunking, excessive play, or leaking power steering fluid?',
+      weight: 12,
+      severity: 'critical',
+      recommendedServiceId: 'sus_strut_control'
+    },
+    {
+      id: 'mto_suspension',
+      areaLabel: 'Suspension, Springs & Shock Absorbers',
+      question: 'Does the vehicle sit and ride level without broken springs, leaking shocks, or rear-end sway?',
+      weight: 10,
+      severity: 'major',
+      recommendedServiceId: 'tir_align_4whl'
+    },
+    {
+      id: 'mto_tires_wheels',
+      areaLabel: 'Tires, Wheels & Tread Depth',
+      question: 'Do all four tires have at least 2.0 mm of tread with no exposed cords, sidewall bulges, or missing lug nuts?',
+      weight: 12,
+      severity: 'critical',
+      recommendedServiceId: 'tir_mount_balance'
+    },
+    {
+      id: 'mto_body_frame',
+      areaLabel: 'Body Structure, Latches & Frame',
+      question: 'Do all doors, hood and trunk latch securely with no perforated rust holes in the floor pan or rockers?',
+      weight: 9,
+      severity: 'major',
+      recommendedServiceId: 'mto_safety_exhaust'
+    },
+    {
+      id: 'mto_lighting',
+      areaLabel: 'Lighting & Electrical Signals',
+      question: 'Do all headlights, turn signals, brake lamps, hazards and licence plate lamps work properly?',
+      weight: 8,
+      severity: 'major',
+      recommendedServiceId: 'diag_elec_parasitic'
+    },
+    {
+      id: 'mto_glass_mirrors',
+      areaLabel: 'Windshield Glass & Mirrors',
+      question: 'Is the windshield free of cracks or chips larger than 13 mm in the driver view, with secure unbroken mirrors?',
+      weight: 7,
+      severity: 'minor',
+      recommendedServiceId: 'mto_safety_exhaust'
+    },
+    {
+      id: 'mto_wipers',
+      areaLabel: 'Windshield Wipers & Washers',
+      question: 'Do both front wipers clear the glass cleanly on all speeds and does the washer spray reach the windshield?',
+      weight: 4,
+      severity: 'minor',
+      recommendedServiceId: 'mto_safety_exhaust'
+    },
+    {
+      id: 'mto_exhaust_emissions',
+      areaLabel: 'Exhaust & Emissions Integrity',
+      question: 'Is the exhaust quiet and leak-free with no fumes entering the passenger cabin?',
+      weight: 8,
+      severity: 'critical',
+      recommendedServiceId: 'mto_safety_exhaust'
+    },
+    {
+      id: 'mto_seatbelts_airbags',
+      areaLabel: 'Seatbelts & Airbag System',
+      question: 'Do all seatbelts latch, retract and lock securely with no airbag warning light on the dash?',
+      weight: 9,
+      severity: 'critical',
+      recommendedServiceId: 'mto_safety_exhaust'
+    },
+    {
+      id: 'mto_fuel_system',
+      areaLabel: 'Fuel System Integrity',
+      question: 'Is the fuel system leak-free with no fuel odour, damaged filler neck, or loose fuel cap or lines?',
+      weight: 6,
+      severity: 'major',
+      recommendedServiceId: 'diag_computer_scan'
+    }
+  ]);
+
+  /*
+   * evaluateSafetyPreCheck(answersObject)
+   * answersObject maps each MTO_SSC_CHECKLIST_ITEMS id to a pass/fail/unsure
+   * value: passing (true, 'pass', 'yes', 'ok'), failing (false, 'fail', 'no',
+   * 'defect'), unsure/answered (undefined, null, 'unsure', 'unknown').
+   * Unsure answers earn half the item weight. Any critical failure or a score
+   * below 70 is an automatic fail; 85+ with zero critical failures passes.
+   * Returns { score, status, criticalFails, recommendedServiceIds, notes }.
+   */
+  function interpretSafetyAnswer(raw) {
+    if (raw === true || raw === 'pass' || raw === 'yes' || raw === 'ok') return 'pass';
+    if (raw === false || raw === 'fail' || raw === 'no' || raw === 'defect') return 'fail';
+    return 'unsure';
+  }
+
+  function evaluateSafetyPreCheck(answersObject) {
+    var earned = 0;
+    var criticalFails = [];
+    var recommendedServiceIds = [];
+    var seenService = {};
+    var unsureCount = 0;
+
+    function pushRecommended(serviceId) {
+      if (serviceId && !seenService[serviceId]) {
+        seenService[serviceId] = true;
+        recommendedServiceIds.push(serviceId);
+      }
+    }
+
+    MTO_SSC_CHECKLIST_ITEMS.forEach(function (item) {
+      var interpretation = interpretSafetyAnswer(answersObject ? answersObject[item.id] : undefined);
+      if (interpretation === 'pass') {
+        earned += item.weight;
+      } else if (interpretation === 'unsure') {
+        earned += item.weight * 0.5;
+        unsureCount++;
+        pushRecommended(item.recommendedServiceId);
+      } else {
+        if (item.severity === 'critical') {
+          criticalFails.push({
+            id: item.id,
+            areaLabel: item.areaLabel,
+            severity: item.severity,
+            recommendedServiceId: item.recommendedServiceId
+          });
+        }
+        pushRecommended(item.recommendedServiceId);
+      }
+    });
+
+    var score = Math.max(0, Math.min(100, Math.round(earned)));
+    var status;
+    if (criticalFails.length > 0 || score < 70) {
+      status = 'fail';
+    } else if (score >= 85) {
+      status = 'pass';
+    } else {
+      status = 'advisory';
+    }
+
+    // The certification inspection is always the final recommended service.
+    pushRecommended('mto_safety_exhaust');
+
+    var notes;
+    if (status === 'pass') {
+      notes = 'All answered Ontario MTO inspection areas pass. Book the Safety Standards Certificate inspection to certify the vehicle.';
+    } else if (status === 'advisory') {
+      notes = 'Advisory items detected (' + unsureCount + ' area(s) to review). Review the recommended corrections before booking the certification inspection.';
+    } else {
+      notes = 'Critical inspection failures detected. The vehicle will not pass an Ontario Safety Standards inspection until the flagged areas are repaired.';
+    }
+
+    return {
+      score: score,
+      status: status,
+      criticalFails: criticalFails,
+      recommendedServiceIds: recommendedServiceIds,
+      notes: notes
+    };
+  }
+
+  var WORK_ORDER_STATES = Object.freeze([
+    'CHECKED_IN',
+    'INSPECTION_DIAGNOSTIC',
+    'PARTS_ORDERED',
+    'IN_BAY_REPAIRING',
+    'QUALITY_ALIGNMENT_TEST',
+    'READY_FOR_PICKUP'
+  ]);
+
+  var SEED_WORK_ORDERS = deepFreeze([
+    {
+      code: 'REV-2048',
+      customerName: 'Marcus Vance',
+      phone: '905-555-0148',
+      licensePlate: 'BVXK 482',
+      vehicle: '2020 Honda Civic Touring',
+      vehicleType: 'sedan',
+      serviceIds: Object.freeze(['brk_pads_rotors', 'tir_align_4whl']),
+      currentState: 'IN_BAY_REPAIRING',
+      bayNumber: 'Bay 2',
+      technicianName: 'Devon K. (310S Red Seal)',
+      technicianNotes: 'Ceramic pads and coated rotors installed on both axles; caliper slides lubricated. Vehicle moves to the 4-wheel laser alignment rack next.',
+      estimatedTotal: 615.84,
+      createdAt: '2025-05-12T08:30:00.000Z',
+      updatedAt: '2025-05-12T10:45:00.000Z'
+    },
+    {
+      code: 'REV-3105',
+      customerName: 'Priya Grewal',
+      phone: '905-555-0192',
+      licensePlate: 'CJDK 905',
+      vehicle: '2018 Ford F-150 XLT',
+      vehicleType: 'truck',
+      serviceIds: Object.freeze(['ac_compressor_cond', 'ac_evac_recharge']),
+      currentState: 'PARTS_ORDERED',
+      bayNumber: 'Bay 4',
+      technicianName: 'Tariq M. (310S Diagnostic Lead)',
+      technicianNotes: 'A/C compressor clutch failed the electronic leak test. OEM compressor and receiver/drier ordered from the Brampton distributor - ETA 45 minutes.',
+      estimatedTotal: 1128.60,
+      createdAt: '2025-05-12T09:15:00.000Z',
+      updatedAt: '2025-05-12T11:10:00.000Z'
+    },
+    {
+      code: 'REV-4092',
+      customerName: 'Elena Rostova',
+      phone: '416-555-0177',
+      licensePlate: 'DTRM 118',
+      vehicle: '2022 Toyota RAV4 XLE',
+      vehicleType: 'suv',
+      serviceIds: Object.freeze(['mto_safety_exhaust', 'oil_full_synth']),
+      currentState: 'READY_FOR_PICKUP',
+      bayNumber: 'Front Lot - Ready Stall 1',
+      technicianName: 'Devon K. (310S Red Seal)',
+      technicianNotes: 'Ontario MTO Safety Standards inspection passed - all pads above 7 mm and tires at 6/32. Full synthetic 0W-20 oil service complete; signed SSC certificate waiting at the front desk.',
+      estimatedTotal: 276.84,
+      createdAt: '2025-05-12T07:45:00.000Z',
+      updatedAt: '2025-05-12T11:30:00.000Z'
+    }
+  ]);
+
+  function normalizeWorkOrderCode(raw) {
+    if (typeof raw !== 'string') return null;
+    var normalized = raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!normalized) return null;
+    if (/^\d{4}$/.test(normalized)) return 'REV' + normalized;
+    return normalized;
+  }
+
+  function phoneDigits(raw) {
+    if (typeof raw !== 'string') return '';
+    return raw.replace(/\D/g, '');
+  }
+
+  function normalizePlate(raw) {
+    if (typeof raw !== 'string') return '';
+    return raw.trim().toUpperCase().replace(/[\s-]/g, '');
+  }
+
+  function phoneOrPlateMatches(workOrder, term) {
+    if (typeof term !== 'string' || term.trim() === '') return false;
+    var digits = phoneDigits(term);
+    var orderDigits = phoneDigits(workOrder.phone);
+    if (digits.length >= 10 && orderDigits.length >= 10) {
+      if (digits === orderDigits) return true;
+    } else if (digits.length === 4) {
+      if (orderDigits.slice(-4) === digits) return true;
+    }
+    return normalizePlate(term) === normalizePlate(workOrder.licensePlate);
+  }
+
+  /*
+   * lookupWorkOrder(query, phoneOrPlate, customWorkOrders)
+   * Matches a work order by code (case/spacing-insensitive, bare 4-digit
+   * numbers allowed), by 10-digit phone, by last-4 phone digits, or by
+   * normalized Ontario license plate. When phoneOrPlate is supplied together
+   * with a matching code it acts as a verification filter: a mismatch on both
+   * phone and plate returns null. Returns the work order object or null.
+   */
+  function lookupWorkOrder(query, phoneOrPlate, customWorkOrders) {
+    var queryRaw = typeof query === 'string' ? query.trim() : '';
+    var secondaryRaw = typeof phoneOrPlate === 'string' ? phoneOrPlate.trim() : '';
+    if (!queryRaw && !secondaryRaw) return null;
+
+    var pool = (Array.isArray(customWorkOrders) ? customWorkOrders.slice() : []).concat(SEED_WORK_ORDERS);
+    var queryCode = normalizeWorkOrderCode(query);
+
+    if (queryCode) {
+      for (var i = 0; i < pool.length; i++) {
+        var candidate = pool[i];
+        if (normalizeWorkOrderCode(candidate.code) === queryCode) {
+          if (!secondaryRaw) return candidate;
+          if (phoneOrPlateMatches(candidate, secondaryRaw)) return candidate;
+          return null;
+        }
+      }
+    }
+
+    for (var j = 0; j < pool.length; j++) {
+      if (queryRaw && phoneOrPlateMatches(pool[j], queryRaw)) return pool[j];
+    }
+    for (var k = 0; k < pool.length; k++) {
+      if (secondaryRaw && phoneOrPlateMatches(pool[k], secondaryRaw)) return pool[k];
+    }
+    return null;
+  }
+
+  function hashString(str) {
+    var hash = 5381;
+    for (var i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
+    }
+    return hash >>> 0;
+  }
+
+  function generateWorkOrderCode(hashInput, taken) {
+    var suffix = 1000 + (hashString(hashInput) % 9000);
+    var attempts = 0;
+    while (attempts < 9000) {
+      var code = 'REV-' + String(suffix);
+      if (!taken[code]) return code;
+      suffix = suffix >= 9999 ? 1000 : suffix + 1;
+      attempts++;
+    }
+    return 'REV-' + String(1000 + (hashString(hashInput + 'X') % 9000));
+  }
+
+  /*
+   * createWorkOrder(bookingPayload, estimatePayload, options)
+   * bookingPayload follows the validateBooking shape (customerName, phone,
+   * vehicleYear/Make/Model or vehicleInfo, vehicleClass, licensePlate,
+   * appointmentDate/appointmentTime or preferredDate/preferredTime,
+   * serviceIds). estimatePayload is a calculateEstimate result or
+   * { estimatedTotal } / { grandTotal }. options: { nowTimestamp,
+   * existingCodes } for deterministic testing. Returns a new CHECKED_IN work
+   * order with a unique REV-XXXX code that never collides with the seeds.
+   */
+  function createWorkOrder(bookingPayload, estimatePayload, options) {
+    options = options || {};
+    var b = bookingPayload || {};
+    var estimate = estimatePayload || {};
+
+    var customerName = typeof b.customerName === 'string' ? b.customerName.trim() : '';
+    var phone = typeof b.phone === 'string' ? b.phone.trim() : '';
+    var licensePlate = typeof b.licensePlate === 'string' ? b.licensePlate.trim().toUpperCase() : '';
+
+    var vehicleParts = [];
+    if (b.vehicleYear !== undefined && b.vehicleYear !== null) vehicleParts.push(String(b.vehicleYear).trim());
+    if (typeof b.vehicleMake === 'string' && b.vehicleMake.trim()) vehicleParts.push(b.vehicleMake.trim());
+    if (typeof b.vehicleModel === 'string' && b.vehicleModel.trim()) vehicleParts.push(b.vehicleModel.trim());
+    var vehicle = (typeof b.vehicleInfo === 'string' && b.vehicleInfo.trim())
+      ? b.vehicleInfo.trim()
+      : vehicleParts.join(' ');
+
+    var serviceIds = [];
+    resolveServices(Array.isArray(b.serviceIds) ? b.serviceIds : []).forEach(function (svc) {
+      serviceIds.push(svc.id);
+    });
+
+    var estimatedTotal = 0;
+    if (typeof estimate.estimatedTotal === 'number' && isFinite(estimate.estimatedTotal)) {
+      estimatedTotal = round2(estimate.estimatedTotal);
+    } else if (typeof estimate.grandTotal === 'number' && isFinite(estimate.grandTotal)) {
+      estimatedTotal = round2(estimate.grandTotal);
+    } else if (typeof estimate.totalLow === 'number' && typeof estimate.totalHigh === 'number' &&
+               isFinite(estimate.totalLow) && isFinite(estimate.totalHigh)) {
+      estimatedTotal = round2((estimate.totalLow + estimate.totalHigh) / 2);
+    }
+
+    var taken = {};
+    SEED_WORK_ORDERS.forEach(function (wo) { taken[wo.code] = true; });
+    if (Array.isArray(options.existingCodes)) {
+      options.existingCodes.forEach(function (code) { taken[code] = true; });
+    }
+
+    var date = b.preferredDate || b.appointmentDate || '';
+    var time = b.preferredTime || b.appointmentTime || '';
+    var hashInput = [customerName, phone, date, time, options.nowTimestamp !== undefined ? String(options.nowTimestamp) : ''].join('|');
+    var code = generateWorkOrderCode(hashInput, taken);
+
+    var createdAt = options.nowTimestamp !== undefined && options.nowTimestamp !== null
+      ? new Date(options.nowTimestamp).toISOString()
+      : new Date().toISOString();
+
+    return {
+      code: code,
+      customerName: customerName,
+      phone: phone,
+      licensePlate: licensePlate,
+      vehicle: vehicle,
+      vehicleType: b.vehicleClass || b.vehicleType || 'sedan',
+      serviceIds: serviceIds,
+      currentState: 'CHECKED_IN',
+      bayNumber: 'Bay 1 (Reception)',
+      technicianName: 'Pending Dispatch (310S Team)',
+      technicianNotes: 'Vehicle checked in at reception. Awaiting bay assignment and technician dispatch.',
+      estimatedTotal: estimatedTotal,
+      createdAt: createdAt,
+      updatedAt: createdAt
+    };
+  }
+
   var api = Object.freeze({
     SHOP_INFO: SHOP_INFO,
     VEHICLE_MULTIPLIERS: VEHICLE_MULTIPLIERS,
@@ -851,7 +1958,15 @@
     SYMPTOM_CATALOG: SYMPTOM_CATALOG,
     calculateEstimate: calculateEstimate,
     validateBooking: validateBooking,
-    recommendServicesBySymptoms: recommendServicesBySymptoms
+    recommendServicesBySymptoms: recommendServicesBySymptoms,
+    DIAGNOSTIC_DECISION_TREE: DIAGNOSTIC_DECISION_TREE,
+    MTO_SSC_CHECKLIST_ITEMS: MTO_SSC_CHECKLIST_ITEMS,
+    WORK_ORDER_STATES: WORK_ORDER_STATES,
+    SEED_WORK_ORDERS: SEED_WORK_ORDERS,
+    evaluateDiagnosticWizard: evaluateDiagnosticWizard,
+    evaluateSafetyPreCheck: evaluateSafetyPreCheck,
+    lookupWorkOrder: lookupWorkOrder,
+    createWorkOrder: createWorkOrder
   });
 
   if (typeof module === 'object' && module.exports) {

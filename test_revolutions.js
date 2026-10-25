@@ -860,6 +860,817 @@ test('app.js renders every catalog surface the UI depends on', function () {
 });
 
 /* ------------------------------------------------------------------ */
+/* Phase 2 - Segment 1 Engine Tests                                     */
+/* ------------------------------------------------------------------ */
+
+group('Phase 2 - Segment 1 Engine Tests');
+
+test('DIAGNOSTIC_DECISION_TREE exposes a rooted, deep-frozen node graph', function () {
+  var tree = Engine.DIAGNOSTIC_DECISION_TREE;
+  assert.strictEqual(tree.rootNodeId, 'step_anomaly');
+  assert.ok(tree.nodes.step_anomaly, 'root node must exist');
+  assert.ok(Object.isFrozen(tree), 'tree must be frozen');
+  assert.ok(Object.isFrozen(tree.nodes), 'nodes map must be frozen');
+  var terminalIds = Object.keys(tree.nodes).filter(function (id) {
+    return tree.nodes[id].type === 'terminal';
+  });
+  assert.ok(terminalIds.length >= 20, 'expected at least 20 terminal nodes, found ' + terminalIds.length);
+  terminalIds.forEach(function (id) {
+    assert.ok(Object.isFrozen(tree.nodes[id]), 'terminal node must be frozen: ' + id);
+  });
+});
+
+test('wizard root branches into the 5 anomaly types with zero dangling pointers', function () {
+  var tree = Engine.DIAGNOSTIC_DECISION_TREE;
+  var root = tree.nodes[tree.rootNodeId];
+  assert.strictEqual(root.type, 'question');
+  assert.strictEqual(root.answerKey, 'anomaly');
+  assert.deepStrictEqual(root.options.map(function (o) { return o.value; }),
+    ['sound', 'vibration', 'warning_light', 'smell', 'fluid_leak']);
+  Object.keys(tree.nodes).forEach(function (id) {
+    var node = tree.nodes[id];
+    if (node.type === 'question') {
+      assert.ok(Array.isArray(node.options) && node.options.length >= 2, 'question node needs options: ' + id);
+      node.options.forEach(function (opt) {
+        assert.ok(tree.nodes[opt.nextNodeId], 'dangling nextNodeId "' + opt.nextNodeId + '" on node ' + id);
+      });
+    }
+  });
+});
+
+test('every wizard terminal prescribes a verbatim SERVICE_CATALOG service id', function () {
+  var tree = Engine.DIAGNOSTIC_DECISION_TREE;
+  var catalogIds = Engine.SERVICE_CATALOG.map(function (s) { return s.id; });
+  var terminalCount = 0;
+  Object.keys(tree.nodes).forEach(function (id) {
+    var node = tree.nodes[id];
+    if (node.type !== 'terminal') return;
+    terminalCount++;
+    assert.ok(catalogIds.indexOf(node.serviceId) !== -1,
+      'terminal ' + id + ' points at unknown service: ' + node.serviceId);
+  });
+  assert.ok(terminalCount >= 20);
+});
+
+test('every wizard terminal carries a valid triage level, causes and technician notes', function () {
+  var levels = { tow_now: 0, schedule_urgent: 0, routine_inspect: 0 };
+  Object.keys(Engine.DIAGNOSTIC_DECISION_TREE.nodes).forEach(function (id) {
+    var node = Engine.DIAGNOSTIC_DECISION_TREE.nodes[id];
+    if (node.type !== 'terminal') return;
+    assert.ok(['tow_now', 'schedule_urgent', 'routine_inspect'].indexOf(node.triageLevel) !== -1,
+      'bad triage level on ' + id + ': ' + node.triageLevel);
+    levels[node.triageLevel]++;
+    assert.ok(Array.isArray(node.rootCauses) && node.rootCauses.length >= 1, 'rootCauses required on ' + id);
+    node.rootCauses.forEach(function (cause) {
+      assert.strictEqual(typeof cause, 'string', 'cause must be a string on ' + id);
+    });
+    assert.strictEqual(typeof node.technicianNotes, 'string');
+    assert.ok(node.technicianNotes.length > 20, 'technicianNotes too short on ' + id);
+  });
+  assert.ok(levels.tow_now >= 1 && levels.schedule_urgent >= 1 && levels.routine_inspect >= 1,
+    'all three triage levels must be reachable');
+});
+
+test('MTO_SSC_CHECKLIST_ITEMS covers exactly the 11 Ontario inspection areas', function () {
+  assert.strictEqual(Engine.MTO_SSC_CHECKLIST_ITEMS.length, 11);
+  assert.deepStrictEqual(Engine.MTO_SSC_CHECKLIST_ITEMS.map(function (i) { return i.id; }), [
+    'mto_brakes', 'mto_steering', 'mto_suspension', 'mto_tires_wheels', 'mto_body_frame',
+    'mto_lighting', 'mto_glass_mirrors', 'mto_wipers', 'mto_exhaust_emissions',
+    'mto_seatbelts_airbags', 'mto_fuel_system'
+  ]);
+});
+
+test('MTO weights sum to exactly 100 with tiered severities and valid service ids', function () {
+  var sum = 0;
+  var severities = { critical: 0, major: 0, minor: 0 };
+  var catalogIds = Engine.SERVICE_CATALOG.map(function (s) { return s.id; });
+  Engine.MTO_SSC_CHECKLIST_ITEMS.forEach(function (item) {
+    assert.ok(item.weight > 0, 'weight must be positive: ' + item.id);
+    assert.ok(['critical', 'major', 'minor'].indexOf(item.severity) !== -1, 'bad severity: ' + item.id);
+    assert.strictEqual(typeof item.question, 'string', 'question required: ' + item.id);
+    assert.ok(item.question.length > 20, 'question too short: ' + item.id);
+    assert.strictEqual(typeof item.areaLabel, 'string', 'areaLabel required: ' + item.id);
+    assert.ok(catalogIds.indexOf(item.recommendedServiceId) !== -1,
+      'MTO item ' + item.id + ' recommends unknown service: ' + item.recommendedServiceId);
+    severities[item.severity]++;
+    sum += item.weight;
+  });
+  assert.strictEqual(sum, 100, 'MTO item weights must sum to exactly 100');
+  assert.ok(severities.critical >= 3 && severities.major >= 2 && severities.minor >= 2,
+    'expected a full spread of severity tiers');
+  assert.ok(Object.isFrozen(Engine.MTO_SSC_CHECKLIST_ITEMS), 'checklist must be frozen');
+  assert.ok(Object.isFrozen(Engine.MTO_SSC_CHECKLIST_ITEMS[0]), 'checklist items must be frozen');
+});
+
+test('WORK_ORDER_STATES defines the 6 lifecycle states in exact order', function () {
+  assert.deepStrictEqual(Engine.WORK_ORDER_STATES, [
+    'CHECKED_IN',
+    'INSPECTION_DIAGNOSTIC',
+    'PARTS_ORDERED',
+    'IN_BAY_REPAIRING',
+    'QUALITY_ALIGNMENT_TEST',
+    'READY_FOR_PICKUP'
+  ]);
+  assert.ok(Object.isFrozen(Engine.WORK_ORDER_STATES));
+});
+
+test('SEED_WORK_ORDERS ships the 3 required sample orders in distinct stages', function () {
+  var seeds = Engine.SEED_WORK_ORDERS;
+  assert.strictEqual(seeds.length, 3);
+  assert.ok(Object.isFrozen(seeds), 'seed work orders must be frozen');
+  var byCode = {};
+  seeds.forEach(function (wo) { byCode[wo.code] = wo; });
+  assert.ok(byCode['REV-2048'], 'REV-2048 seed required');
+  assert.ok(byCode['REV-3105'], 'REV-3105 seed required');
+  assert.ok(byCode['REV-4092'], 'REV-4092 seed required');
+  assert.strictEqual(byCode['REV-2048'].currentState, 'IN_BAY_REPAIRING');
+  assert.strictEqual(byCode['REV-3105'].currentState, 'PARTS_ORDERED');
+  assert.strictEqual(byCode['REV-4092'].currentState, 'READY_FOR_PICKUP');
+});
+
+test('SEED_WORK_ORDERS entries satisfy the full work order schema', function () {
+  var catalogIds = Engine.SERVICE_CATALOG.map(function (s) { return s.id; });
+  Engine.SEED_WORK_ORDERS.forEach(function (wo) {
+    assert.ok(/^REV-\d{4}$/.test(wo.code), 'bad code format: ' + wo.code);
+    assert.ok(wo.customerName.length > 1, 'customerName required: ' + wo.code);
+    assert.strictEqual(wo.phone.replace(/\D/g, '').length, 10, 'phone needs 10 digits: ' + wo.code);
+    assert.ok(wo.licensePlate.length > 3, 'licensePlate required: ' + wo.code);
+    assert.ok(wo.vehicle.length > 5, 'vehicle description required: ' + wo.code);
+    assert.ok(wo.serviceIds.length >= 1, 'at least one service required: ' + wo.code);
+    wo.serviceIds.forEach(function (id) {
+      assert.ok(catalogIds.indexOf(id) !== -1, 'unknown service on ' + wo.code + ': ' + id);
+    });
+    assert.ok(Engine.WORK_ORDER_STATES.indexOf(wo.currentState) !== -1,
+      'currentState must be a lifecycle state: ' + wo.code);
+    assert.ok(wo.bayNumber.length > 2, 'bayNumber required: ' + wo.code);
+    assert.ok(wo.technicianName.length > 2, 'technicianName required: ' + wo.code);
+    assert.ok(wo.technicianNotes.length > 20, 'technicianNotes required: ' + wo.code);
+    assert.ok(typeof wo.estimatedTotal === 'number' && wo.estimatedTotal > 0,
+      'estimatedTotal must be positive CAD: ' + wo.code);
+    assert.ok(!Number.isNaN(Date.parse(wo.createdAt)), 'createdAt must parse: ' + wo.code);
+    assert.ok(!Number.isNaN(Date.parse(wo.updatedAt)), 'updatedAt must parse: ' + wo.code);
+  });
+});
+
+test('evaluateDiagnosticWizard: knocking engine sound triages tow_now with full contract', function () {
+  var r = Engine.evaluateDiagnosticWizard({
+    anomaly: 'sound', location: 'engine_bay', condition: 'knocking_or_ticking'
+  });
+  assert.strictEqual(r.triageLevel, 'tow_now');
+  assert.strictEqual(r.serviceId, 'diag_computer_scan');
+  assert.ok(Array.isArray(r.rootCauses) && r.rootCauses.length >= 1);
+  assert.strictEqual(typeof r.technicianNotes, 'string');
+  assert.ok(r.technicianNotes.length > 20);
+  assert.strictEqual(typeof r.recommendedUrgency, 'string');
+  assert.ok(r.recommendedUrgency.length > 10);
+});
+
+test('evaluateDiagnosticWizard: grinding brakes triage schedule_urgent with brake service', function () {
+  var r = Engine.evaluateDiagnosticWizard({
+    anomaly: 'sound', location: 'wheels_or_brakes', condition: 'grind_when_braking'
+  });
+  assert.strictEqual(r.triageLevel, 'schedule_urgent');
+  assert.strictEqual(r.serviceId, 'brk_pads_rotors');
+  assert.ok(r.recommendedUrgency.indexOf('24-48') !== -1);
+});
+
+test('evaluateDiagnosticWizard: brake squeal stays routine_inspect', function () {
+  var r = Engine.evaluateDiagnosticWizard({
+    anomaly: 'sound', location: 'wheels_or_brakes', condition: 'squeal_when_braking'
+  });
+  assert.strictEqual(r.triageLevel, 'routine_inspect');
+  assert.strictEqual(r.serviceId, 'brk_pads_rotors');
+});
+
+test('evaluateDiagnosticWizard: flashing CEL is tow_now, solid CEL stays routine', function () {
+  var flashing = Engine.evaluateDiagnosticWizard({
+    anomaly: 'warning_light', location: 'check_engine', condition: 'flashing'
+  });
+  assert.strictEqual(flashing.triageLevel, 'tow_now');
+  assert.strictEqual(flashing.serviceId, 'diag_computer_scan');
+  var solid = Engine.evaluateDiagnosticWizard({
+    anomaly: 'warning_light', location: 'check_engine', condition: 'solid'
+  });
+  assert.strictEqual(solid.triageLevel, 'routine_inspect');
+  assert.strictEqual(solid.serviceId, 'diag_computer_scan');
+});
+
+test('evaluateDiagnosticWizard: brake fluid leak is tow_now; condensation is a routine A/C check', function () {
+  var leak = Engine.evaluateDiagnosticWizard({
+    anomaly: 'fluid_leak', location: 'under_front_wheel_area', condition: 'low_brake_fluid_warning'
+  });
+  assert.strictEqual(leak.triageLevel, 'tow_now');
+  assert.strictEqual(leak.serviceId, 'brk_pads_rotors');
+  var drip = Engine.evaluateDiagnosticWizard({
+    anomaly: 'fluid_leak', location: 'under_vehicle_middle', condition: 'clear_water'
+  });
+  assert.strictEqual(drip.triageLevel, 'routine_inspect');
+  assert.strictEqual(drip.serviceId, 'ac_evac_recharge');
+});
+
+test('evaluateDiagnosticWizard falls back safely on empty, null and malformed answers', function () {
+  [null, undefined, {}, { anomaly: 'sound' }, { anomaly: 'nonsense' }, 'garbage-input'].forEach(function (bad) {
+    var r = Engine.evaluateDiagnosticWizard(bad);
+    assert.strictEqual(r.triageLevel, 'routine_inspect', 'fallback must be routine_inspect');
+    assert.strictEqual(r.serviceId, 'diag_computer_scan', 'fallback must prescribe a diagnostic scan');
+    assert.ok(Array.isArray(r.rootCauses) && r.rootCauses.length >= 1);
+    assert.strictEqual(typeof r.technicianNotes, 'string');
+    assert.strictEqual(typeof r.recommendedUrgency, 'string');
+  });
+});
+
+test('evaluateDiagnosticWizard supports direct terminalNodeId and emergency overrides', function () {
+  var direct = Engine.evaluateDiagnosticWizard({ terminalNodeId: 'term_flashing_cel' });
+  assert.strictEqual(direct.triageLevel, 'tow_now');
+  assert.strictEqual(direct.serviceId, 'diag_computer_scan');
+  assert.strictEqual(Engine.evaluateDiagnosticWizard({ brakeFailure: true }).triageLevel, 'tow_now');
+  assert.strictEqual(Engine.evaluateDiagnosticWizard({ overheating: true }).triageLevel, 'tow_now');
+  assert.strictEqual(Engine.evaluateDiagnosticWizard({ flashingWarningLight: true }).triageLevel, 'tow_now');
+});
+
+function allSafetyPassExcept(overrides) {
+  var answers = {};
+  Engine.MTO_SSC_CHECKLIST_ITEMS.forEach(function (item) { answers[item.id] = 'pass'; });
+  return Object.assign(answers, overrides || {});
+}
+
+test('evaluateSafetyPreCheck: all 11 areas pass scores 100 with pass status', function () {
+  var r = Engine.evaluateSafetyPreCheck(allSafetyPassExcept());
+  assert.strictEqual(r.score, 100);
+  assert.strictEqual(r.status, 'pass');
+  assert.deepStrictEqual(r.criticalFails, []);
+  assert.ok(r.recommendedServiceIds.indexOf('mto_safety_exhaust') !== -1,
+    'the certification inspection must always be recommended');
+  assert.strictEqual(typeof r.notes, 'string');
+  assert.ok(r.notes.length > 10);
+});
+
+test('evaluateSafetyPreCheck: a single critical failure overrides to fail despite an 85 score', function () {
+  var r = Engine.evaluateSafetyPreCheck(allSafetyPassExcept({ mto_brakes: 'fail' }));
+  assert.strictEqual(r.score, 85);
+  assert.strictEqual(r.status, 'fail');
+  assert.strictEqual(r.criticalFails.length, 1);
+  assert.strictEqual(r.criticalFails[0].id, 'mto_brakes');
+  assert.strictEqual(r.criticalFails[0].severity, 'critical');
+  assert.ok(r.recommendedServiceIds.indexOf('brk_pads_rotors') !== -1);
+});
+
+test('evaluateSafetyPreCheck: major-only failures inside the 70-84 band are advisory', function () {
+  var r = Engine.evaluateSafetyPreCheck(allSafetyPassExcept({ mto_suspension: 'fail', mto_lighting: 'no' }));
+  assert.strictEqual(r.score, 82);
+  assert.strictEqual(r.status, 'advisory');
+  assert.deepStrictEqual(r.criticalFails, []);
+});
+
+test('evaluateSafetyPreCheck: every failing area drives a corrective service id', function () {
+  var r = Engine.evaluateSafetyPreCheck(allSafetyPassExcept({ mto_tires_wheels: false, mto_steering: 'defect' }));
+  assert.strictEqual(r.status, 'fail');
+  assert.strictEqual(r.criticalFails.length, 2);
+  assert.ok(r.recommendedServiceIds.indexOf('tir_mount_balance') !== -1);
+  assert.ok(r.recommendedServiceIds.indexOf('sus_strut_control') !== -1);
+});
+
+test('evaluateSafetyPreCheck: all areas failing scores 0 and flags every critical item', function () {
+  var answers = {};
+  Engine.MTO_SSC_CHECKLIST_ITEMS.forEach(function (item) { answers[item.id] = 'fail'; });
+  var r = Engine.evaluateSafetyPreCheck(answers);
+  assert.strictEqual(r.score, 0);
+  assert.strictEqual(r.status, 'fail');
+  var criticalCount = Engine.MTO_SSC_CHECKLIST_ITEMS.filter(function (item) {
+    return item.severity === 'critical';
+  }).length;
+  assert.strictEqual(r.criticalFails.length, criticalCount);
+  assert.ok(r.recommendedServiceIds.length >= 5);
+});
+
+test('evaluateSafetyPreCheck: unanswered items earn half weight and mixed representations work', function () {
+  var empty = Engine.evaluateSafetyPreCheck({});
+  assert.strictEqual(empty.score, 50, '11 items at half weight must score 50');
+  assert.strictEqual(empty.status, 'fail', 'a 50 score is below the 70 fail line');
+  assert.deepStrictEqual(empty.criticalFails, []);
+  var mixed = Engine.evaluateSafetyPreCheck(allSafetyPassExcept({
+    mto_brakes: true,
+    mto_steering: 'yes',
+    mto_glass_mirrors: 'ok',
+    mto_wipers: null,
+    mto_fuel_system: 'unknown'
+  }));
+  assert.strictEqual(mixed.score, 95);
+  assert.strictEqual(mixed.status, 'pass');
+});
+
+test('lookupWorkOrder matches by code, bare number, phone and license plate', function () {
+  assert.strictEqual(Engine.lookupWorkOrder('rev-2048').code, 'REV-2048');
+  assert.strictEqual(Engine.lookupWorkOrder(' 2048 ').code, 'REV-2048');
+  assert.strictEqual(Engine.lookupWorkOrder('REV-4092').currentState, 'READY_FOR_PICKUP');
+  assert.strictEqual(Engine.lookupWorkOrder('(905) 555-0192').code, 'REV-3105');
+  assert.strictEqual(Engine.lookupWorkOrder('bvxk 482').code, 'REV-2048');
+  assert.strictEqual(Engine.lookupWorkOrder('dtrm-118').code, 'REV-4092');
+});
+
+test('lookupWorkOrder enforces secondary verification and returns null for unknowns', function () {
+  assert.strictEqual(Engine.lookupWorkOrder('REV-2048', '9055550148').code, 'REV-2048');
+  assert.strictEqual(Engine.lookupWorkOrder('REV-2048', '0148').code, 'REV-2048');
+  assert.strictEqual(Engine.lookupWorkOrder('REV-2048', 'BVXK 482').code, 'REV-2048');
+  assert.strictEqual(Engine.lookupWorkOrder('REV-2048', '416-555-0177'), null,
+    'a matching code with a mismatched phone must return null');
+  assert.strictEqual(Engine.lookupWorkOrder('REV-9999'), null);
+  assert.strictEqual(Engine.lookupWorkOrder('9999'), null);
+  assert.strictEqual(Engine.lookupWorkOrder(''), null);
+  assert.strictEqual(Engine.lookupWorkOrder('', ''), null);
+  assert.strictEqual(Engine.lookupWorkOrder(null, null), null);
+  var custom = [{
+    code: 'REV-7777',
+    customerName: 'Test Driver',
+    phone: '289-555-0123',
+    licensePlate: 'TEST 001',
+    vehicle: '2015 Mazda 3 GX',
+    vehicleType: 'sedan',
+    serviceIds: ['oil_full_synth'],
+    currentState: 'CHECKED_IN',
+    bayNumber: 'Bay 1',
+    technicianName: 'Queue',
+    technicianNotes: 'Just checked in for testing.',
+    estimatedTotal: 98.2,
+    createdAt: '2026-10-24T09:00:00.000Z',
+    updatedAt: '2026-10-24T09:00:00.000Z'
+  }];
+  assert.strictEqual(Engine.lookupWorkOrder('rev-7777', null, custom).code, 'REV-7777');
+  assert.strictEqual(Engine.lookupWorkOrder('289-555-0123', null, custom).code, 'REV-7777');
+  assert.strictEqual(Engine.lookupWorkOrder('TEST 001', null, custom).code, 'REV-7777');
+  assert.strictEqual(Engine.lookupWorkOrder('REV-7777'), null, 'custom orders must not leak into the seed pool');
+});
+
+test('createWorkOrder builds a CHECKED_IN order with estimate-derived total and timestamps', function () {
+  var estimate = Engine.calculateEstimate({
+    serviceIds: ['brk_pads_rotors', 'tir_align_4whl'],
+    origin: 'domestic',
+    vehicleClass: 'sedan'
+  });
+  var wo = Engine.createWorkOrder({
+    customerName: 'Sam Rivera',
+    phone: '(905) 555-0180',
+    licensePlate: 'SAMR 180',
+    vehicleYear: 2020,
+    vehicleMake: 'Honda',
+    vehicleModel: 'Civic Touring',
+    vehicleClass: 'sedan',
+    serviceIds: ['brk_pads_rotors', 'tir_align_4whl'],
+    appointmentDate: '2026-10-27',
+    appointmentTime: '09:00'
+  }, estimate, { nowTimestamp: '2026-10-24T12:00:00.000Z' });
+  assert.ok(/^REV-\d{4}$/.test(wo.code), 'code must match REV-XXXX: ' + wo.code);
+  assert.strictEqual(wo.currentState, 'CHECKED_IN');
+  assert.strictEqual(wo.customerName, 'Sam Rivera');
+  assert.strictEqual(wo.phone, '(905) 555-0180');
+  assert.strictEqual(wo.licensePlate, 'SAMR 180');
+  assert.strictEqual(wo.vehicle.indexOf('2020 Honda Civic'), 0);
+  assert.strictEqual(wo.vehicleType, 'sedan');
+  assert.deepStrictEqual(wo.serviceIds, ['brk_pads_rotors', 'tir_align_4whl']);
+  assert.strictEqual(wo.estimatedTotal, round2((estimate.totalLow + estimate.totalHigh) / 2));
+  assert.strictEqual(wo.createdAt, '2026-10-24T12:00:00.000Z');
+  assert.strictEqual(wo.updatedAt, wo.createdAt);
+  assert.strictEqual(typeof wo.technicianNotes, 'string');
+  assert.ok(wo.bayNumber.length > 2);
+  assert.ok(wo.technicianName.length > 2);
+});
+
+test('createWorkOrder codes never collide with seeds, stay unique and stay deterministic', function () {
+  var seedCodes = Engine.SEED_WORK_ORDERS.map(function (wo) { return wo.code; });
+  var estimate = Engine.calculateEstimate({ serviceIds: ['oil_full_synth'] });
+  var payloads = [
+    { customerName: 'Ava One', phone: '905-555-0101', serviceIds: ['oil_full_synth'], appointmentDate: '2026-10-27', appointmentTime: '09:00' },
+    { customerName: 'Ben Two', phone: '905-555-0102', serviceIds: ['ac_evac_recharge'], appointmentDate: '2026-10-28', appointmentTime: '10:30' },
+    { customerName: 'Cy Three', phone: '905-555-0103', serviceIds: ['mto_safety_exhaust'], appointmentDate: '2026-10-29', appointmentTime: '13:15' }
+  ];
+  var seen = {};
+  payloads.forEach(function (p) {
+    var wo = Engine.createWorkOrder(p, estimate, { nowTimestamp: '2026-10-24T12:00:00.000Z' });
+    assert.ok(seedCodes.indexOf(wo.code) === -1, 'code collided with a seed: ' + wo.code);
+    assert.ok(!seen[wo.code], 'duplicate code generated: ' + wo.code);
+    seen[wo.code] = true;
+  });
+  var repeat = {
+    customerName: 'Dana Repeat',
+    phone: '905-555-0104',
+    serviceIds: ['tir_mount_balance'],
+    appointmentDate: '2026-11-02',
+    appointmentTime: '11:00'
+  };
+  var first = Engine.createWorkOrder(repeat, { estimatedTotal: 254.3 }, { nowTimestamp: '2026-10-24T08:00:00.000Z' });
+  var second = Engine.createWorkOrder(repeat, { estimatedTotal: 254.3 }, { nowTimestamp: '2026-10-24T08:00:00.000Z' });
+  assert.strictEqual(first.code, second.code, 'identical payloads must generate identical codes');
+  assert.strictEqual(second.estimatedTotal, 254.3);
+});
+
+test('createWorkOrder handles a missing estimate and filters unknown service ids', function () {
+  var wo = Engine.createWorkOrder({
+    customerName: 'Eve Noestimate',
+    phone: '905-555-0105',
+    serviceIds: ['oil_full_synth', 'not_a_real_service'],
+    appointmentDate: '2026-11-03',
+    appointmentTime: '14:00'
+  });
+  assert.deepStrictEqual(wo.serviceIds, ['oil_full_synth']);
+  assert.strictEqual(wo.estimatedTotal, 0);
+  assert.ok(/^REV-\d{4}$/.test(wo.code));
+  assert.strictEqual(wo.currentState, 'CHECKED_IN');
+  assert.strictEqual(typeof wo.createdAt, 'string');
+  assert.ok(!Number.isNaN(Date.parse(wo.createdAt)));
+});
+
+/* ------------------------------------------------------------------ */
+/* Phase 2 - Segment 2 DOM Integrity Tests                             */
+/* ------------------------------------------------------------------ */
+
+group('Phase 2 - Segment 2 DOM Integrity Tests');
+
+var PHASE2_DOM_IDS = [
+  'wizard-section',
+  'wizard-container',
+  'wizard-step-indicator',
+  'wizard-options',
+  'wizard-result-card',
+  'btn-wizard-add-service',
+  'safety-precheck-section',
+  'safety-checklist-container',
+  'safety-score-gauge',
+  'safety-summary-alert',
+  'btn-safety-book-inspection',
+  'bay-tracker-section',
+  'tracker-input-code',
+  'tracker-input-phone',
+  'btn-track-vehicle',
+  'tracker-status-timeline',
+  'tracker-technician-notes',
+  'btn-track-sample-1',
+  'btn-track-sample-2',
+  'tracker-feedback'
+];
+
+test('every required Phase 2 DOM ID exists verbatim in index.html', function () {
+  PHASE2_DOM_IDS.forEach(function (id) {
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+      'index.html is missing required Phase 2 DOM ID: #' + id);
+  });
+  assert.strictEqual(PHASE2_DOM_IDS.length, 20, 'the full Phase 2 ID inventory must be covered');
+});
+
+test('the 17 contract-mandated interactive IDs are all present', function () {
+  [
+    'wizard-container', 'wizard-step-indicator', 'wizard-options',
+    'wizard-result-card', 'btn-wizard-add-service',
+    'safety-checklist-container', 'safety-score-gauge', 'safety-summary-alert',
+    'btn-safety-book-inspection',
+    'tracker-input-code', 'tracker-input-phone', 'btn-track-vehicle',
+    'tracker-status-timeline', 'tracker-technician-notes',
+    'btn-track-sample-1', 'btn-track-sample-2', 'tracker-feedback'
+  ].forEach(function (id) {
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1, 'missing contract DOM ID: #' + id);
+  });
+});
+
+test('wizard section copy, containers and CTA are wired for app.js', function () {
+  assert.ok(INDEX_HTML.indexOf('id="wizard-section"') < INDEX_HTML.indexOf('id="wizard-container"'),
+    'the wizard wrapper section must come first');
+  assert.ok(INDEX_HTML.indexOf('Add Diagnostic Service to Estimate') !== -1,
+    'the wizard CTA must read "Add Diagnostic Service to Estimate"');
+  assert.ok(INDEX_HTML.indexOf('What&rsquo;s That Noise / Warning Light?') !== -1,
+    'the wizard heading must match the What-Is-That-Noise concept');
+  assert.ok(INDEX_HTML.indexOf('id="btn-wizard-add-service" type="button"') !== -1,
+    'the wizard CTA must be a type="button" button');
+});
+
+test('safety pre-check section copy, gauge, alert and CTA are in place', function () {
+  assert.ok(INDEX_HTML.indexOf('Book Official MTO Safety Inspection') !== -1,
+    'the safety CTA must read "Book Official MTO Safety Inspection"');
+  assert.ok(INDEX_HTML.indexOf('Ontario Safety Standards Certificate (MTO SSC) Pre-Check') !== -1,
+    'the safety section heading must name the MTO SSC pre-check');
+  assert.ok(INDEX_HTML.indexOf('id="safety-score-gauge"') !== -1 &&
+    INDEX_HTML.indexOf('id="safety-summary-alert"') !== -1,
+    'gauge and summary alert must both exist');
+});
+
+test('tracker inputs carry the required placeholders and button labels', function () {
+  assert.ok(INDEX_HTML.indexOf('placeholder="REV-2048"') !== -1,
+    'the code input must use the REV-2048 placeholder');
+  assert.ok(INDEX_HTML.indexOf('placeholder="Phone or Plate"') !== -1,
+    'the verification input must use the Phone or Plate placeholder');
+  assert.ok(INDEX_HTML.indexOf('Load REV-2048: In Bay') !== -1,
+    'sample button 1 must be labelled Load REV-2048: In Bay');
+  assert.ok(INDEX_HTML.indexOf('Load REV-3105: Parts Ordered') !== -1,
+    'sample button 2 must be labelled Load REV-3105: Parts Ordered');
+});
+
+test('the bay tracker timeline is a 6-stage ordered list with verbatim stage labels', function () {
+  var timelineStart = INDEX_HTML.indexOf('id="tracker-status-timeline"');
+  var timelineEnd = INDEX_HTML.indexOf('</ol>', timelineStart);
+  assert.ok(timelineStart !== -1 && timelineEnd !== -1, 'tracker-status-timeline must be a list');
+  assert.ok(INDEX_HTML.indexOf('<ol id="tracker-status-timeline"') !== -1,
+    'the timeline must be an <ol>');
+  var timelineHtml = INDEX_HTML.slice(timelineStart, timelineEnd);
+  var stageLabels = ['Checked In', 'Inspection &amp; Diagnostics', 'Parts Ordered',
+    'In Bay / Repairing', 'Quality &amp; Alignment', 'Ready for Pickup'];
+  stageLabels.forEach(function (label) {
+    assert.ok(timelineHtml.indexOf(label) !== -1, 'timeline stage label missing: ' + label);
+  });
+  assert.strictEqual((timelineHtml.match(/<li class="tl-step">/g) || []).length, 6,
+    'the timeline must render exactly 6 stage steps');
+});
+
+test('the six timeline stages mirror the engine WORK_ORDER_STATES lifecycle', function () {
+  assert.strictEqual(Engine.WORK_ORDER_STATES.length, 6,
+    'the engine lifecycle and the timeline must both have 6 stages');
+  ['Checked In', 'Inspection &amp; Diagnostics', 'Parts Ordered',
+    'In Bay / Repairing', 'Quality &amp; Alignment', 'Ready for Pickup'].forEach(function (label) {
+    assert.ok(INDEX_HTML.indexOf(label) !== -1, 'stage label must exist in index.html: ' + label);
+  });
+});
+
+test('quick-nav links point at all three new Phase 2 sections', function () {
+  ['wizard-section', 'safety-precheck-section', 'bay-tracker-section'].forEach(function (sectionId) {
+    assert.ok(INDEX_HTML.indexOf('href="#' + sectionId + '"') !== -1,
+      'quick-nav must link to #' + sectionId);
+  });
+});
+
+test('every Phase 1 mandatory DOM ID remains present and uncorrupted', function () {
+  MANDATORY_DOM_IDS.forEach(function (id) {
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+      'Phase 1 DOM ID was lost or corrupted: #' + id);
+  });
+});
+
+test('Phase 1 asset paths and branding remain intact after the Phase 2 insert', function () {
+  ['assets/hero_bay.jpg', 'assets/diagnostics_tech.jpg', 'assets/safety_badge.jpg'].forEach(function (asset) {
+    assert.ok(INDEX_HTML.indexOf(asset) !== -1, 'asset reference lost: ' + asset);
+  });
+  assert.ok(INDEX_HTML.indexOf('Revolutions Automotive') !== -1);
+  assert.ok(INDEX_HTML.indexOf('1-15A Fisherman Dr, Brampton, ON L7A 1B7') !== -1);
+  assert.ok(INDEX_HTML.indexOf('(905) 846-8351') !== -1);
+  assert.ok(INDEX_HTML.indexOf('<script src="revolutions_engine.js"></script>') !== -1);
+  assert.ok(INDEX_HTML.indexOf('<script src="app.js"></script>') !== -1);
+});
+
+test('styles.css ships the wizard container, step indicator, options and result card rules', function () {
+  ['.wizard-container', '.wizard-step-indicator', '.wizard-options',
+    '.wizard-option', '.wizard-result-card', '.btn-wizard-cta'].forEach(function (selector) {
+    assert.ok(STYLES_CSS.indexOf(selector) !== -1, 'styles.css missing selector: ' + selector);
+  });
+});
+
+test('styles.css color-codes all three diagnostic triage levels', function () {
+  ['.triage-tow_now', '.triage-schedule_urgent', '.triage-routine_inspect',
+    '.triage-badge'].forEach(function (selector) {
+    assert.ok(STYLES_CSS.indexOf(selector) !== -1, 'styles.css missing triage selector: ' + selector);
+  });
+  assert.ok(STYLES_CSS.indexOf('@keyframes triage-pulse') !== -1,
+    'the tow_now badge must carry a pulsating animation');
+});
+
+test('styles.css ships the MTO gauge and summary alert with pass/advisory/fail colors', function () {
+  ['.safety-score-gauge', '.safety-summary-alert', '.safety-item',
+    '.safety-toggle', '.toggle-pass', '.toggle-fail', '.toggle-unsure'].forEach(function (selector) {
+    assert.ok(STYLES_CSS.indexOf(selector) !== -1, 'styles.css missing safety selector: ' + selector);
+  });
+  ['.is-pass', '.is-advisory', '.is-fail'].forEach(function (state) {
+    assert.ok(STYLES_CSS.indexOf('.safety-score-gauge' + state) !== -1,
+      'styles.css missing gauge state: ' + state);
+    assert.ok(STYLES_CSS.indexOf('.safety-summary-alert' + state) !== -1,
+      'styles.css missing alert state: ' + state);
+  });
+});
+
+test('styles.css ships the bay tracker timeline with complete, active and pending states', function () {
+  ['.tracker-status-timeline', '.tl-step', '.tl-step.is-complete',
+    '.tl-step.is-active', '.tl-step.is-pending'].forEach(function (selector) {
+    assert.ok(STYLES_CSS.indexOf(selector) !== -1, 'styles.css missing timeline selector: ' + selector);
+  });
+  assert.ok(STYLES_CSS.indexOf('@keyframes bay-pulse') !== -1,
+    'the active timeline stage must carry the pulsating gold glow');
+  assert.ok(STYLES_CSS.indexOf('.tracker-technician-notes') !== -1,
+    'technician notes panel must be styled');
+});
+
+test('Phase 2 layouts stay responsive on tablet and phone breakpoints', function () {
+  assert.ok(STYLES_CSS.indexOf('.safety-layout') !== -1, 'safety layout grid required');
+  assert.ok(STYLES_CSS.indexOf('.tracker-form') !== -1, 'tracker form grid required');
+  assert.ok(STYLES_CSS.indexOf('.tracker-samples') !== -1, 'tracker sample row required');
+  var tabletRule = '@media (max-width: 1024px)';
+  var phoneRule = '@media (max-width: 720px)';
+  assert.ok(STYLES_CSS.indexOf(tabletRule, STYLES_CSS.indexOf('Phase 2')) !== -1,
+    'Phase 2 tablet breakpoint required');
+  assert.ok(STYLES_CSS.indexOf(phoneRule, STYLES_CSS.indexOf('Phase 2')) !== -1,
+    'Phase 2 phone breakpoint required');
+});
+
+/* ------------------------------------------------------------------ */
+/* Phase 2 - Segment 3 Controller & Anti-Drift Tests                   */
+/* ------------------------------------------------------------------ */
+
+group('Phase 2 - Segment 3 Controller & Anti-Drift Tests');
+
+test('anti-drift: every DOM ID referenced in app.js exists verbatim in index.html', function () {
+  var ids = [];
+  var reGetById = /getElementById\(\s*['"]([^'"]+)['"]\s*\)/g;
+  var reQueryId = /querySelector(?:All)?\(\s*['"]#([A-Za-z0-9_-]+)['"]\s*\)/g;
+  var match;
+  while ((match = reGetById.exec(APP_JS)) !== null) ids.push(match[1]);
+  while ((match = reQueryId.exec(APP_JS)) !== null) ids.push(match[1]);
+  assert.ok(ids.length >= 40, 'expected at least 40 DOM references in app.js, found ' + ids.length);
+  ids.forEach(function (id) {
+    assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+      'app.js references missing DOM ID: #' + id);
+  });
+});
+
+test('all 17 Phase 2 interactive DOM IDs are wired inside app.js', function () {
+  [
+    'wizard-container', 'wizard-step-indicator', 'wizard-options',
+    'wizard-result-card', 'btn-wizard-add-service',
+    'safety-checklist-container', 'safety-score-gauge', 'safety-summary-alert',
+    'btn-safety-book-inspection',
+    'tracker-input-code', 'tracker-input-phone', 'btn-track-vehicle',
+    'tracker-status-timeline', 'tracker-technician-notes',
+    'btn-track-sample-1', 'btn-track-sample-2', 'tracker-feedback'
+  ].forEach(function (id) {
+    assert.ok(APP_JS.indexOf(id) !== -1, 'app.js must wire #' + id);
+  });
+});
+
+test('app.js integrates the full Phase 2 engine API surface', function () {
+  [
+    'DIAGNOSTIC_DECISION_TREE',
+    'MTO_SSC_CHECKLIST_ITEMS',
+    'WORK_ORDER_STATES',
+    'evaluateDiagnosticWizard',
+    'evaluateSafetyPreCheck',
+    'lookupWorkOrder',
+    'createWorkOrder'
+  ].forEach(function (token) {
+    assert.ok(APP_JS.indexOf(token) !== -1, 'app.js must call ' + token);
+  });
+});
+
+test('wizard step indicator renders the three verbatim step prompts', function () {
+  [
+    'Step 1 of 3: Select Anomaly Type',
+    'Step 2 of 3: Identify Location',
+    'Step 3 of 3: Driving Condition'
+  ].forEach(function (prompt) {
+    assert.ok(APP_JS.indexOf(prompt) !== -1, 'app.js must render "' + prompt + '"');
+  });
+  assert.ok(APP_JS.indexOf('renderWizardResult') !== -1, 'the wizard must render its result card');
+  assert.ok(APP_JS.indexOf('Start Over') !== -1, 'the wizard must offer a Start Over reset');
+});
+
+test('wizard result card renders all three color-coded triage badges', function () {
+  assert.ok(APP_JS.indexOf('triage-badge') !== -1, 'triage badge class required');
+  [
+    'triage-tow_now',
+    'triage-schedule_urgent',
+    'triage-routine_inspect'
+  ].forEach(function (cls) {
+    assert.ok(APP_JS.indexOf(cls) !== -1, 'app.js must apply the ' + cls + ' badge class');
+  });
+  assert.ok(APP_JS.indexOf('Probable Root Causes') !== -1, 'root causes must be rendered');
+  assert.ok(APP_JS.indexOf('Technician notes:') !== -1, 'technician notes must be rendered');
+});
+
+test('wizard CTA stores the recommended service and scrolls to the estimate', function () {
+  assert.ok(APP_JS.indexOf('recommendedServiceId') !== -1,
+    'the CTA must carry the recommended service id');
+  assert.ok(APP_JS.indexOf('estimate-summary-card') !== -1,
+    'the CTA must scroll to the estimate summary card');
+  assert.ok(APP_JS.indexOf('scrollIntoView') !== -1, 'smooth scroll is required');
+  assert.ok(APP_JS.indexOf('Added to estimate:') !== -1,
+    'the CTA must confirm the service was added');
+});
+
+test('safety checklist renders pass/fail/unsure toggles and verdict styling', function () {
+  ['toggle-pass', 'toggle-fail', 'toggle-unsure'].forEach(function (cls) {
+    assert.ok(APP_JS.indexOf(cls) !== -1, 'app.js must render ' + cls + ' toggles');
+  });
+  ['is-pass', 'is-advisory', 'is-fail'].forEach(function (cls) {
+    assert.ok(APP_JS.indexOf(cls) !== -1, 'app.js must apply the ' + cls + ' verdict class');
+  });
+  assert.ok(APP_JS.indexOf('Instant-fail for Ontario MTO certification') !== -1,
+    'critical failures must trigger the instant-fail compliance warning');
+});
+
+test('safety CTA books the MTO inspection service and focuses the booking form', function () {
+  assert.ok(APP_JS.indexOf('mto_safety_exhaust') !== -1,
+    'the safety CTA must select the Ontario Safety Inspection service');
+  assert.ok(APP_JS.indexOf('btn-safety-book-inspection') !== -1,
+    'the safety CTA button must be wired');
+  assert.ok(APP_JS.indexOf('booking-form') !== -1,
+    'the safety CTA must lead to the booking form');
+});
+
+test('bay tracker renders the 6-state timeline with complete, active and pending states', function () {
+  ['is-complete', 'is-active', 'is-pending'].forEach(function (cls) {
+    assert.ok(APP_JS.indexOf(cls) !== -1, 'app.js must apply the ' + cls + ' timeline state');
+  });
+  assert.ok(APP_JS.indexOf('WORK_ORDER_STATES') !== -1,
+    'the timeline must iterate the engine lifecycle states');
+  ['Checked In', 'Inspection & Diagnostics', 'Parts Ordered',
+    'In Bay / Repairing', 'Quality & Alignment', 'Ready for Pickup'].forEach(function (label) {
+    assert.ok(APP_JS.indexOf(label) !== -1, 'timeline label must be rendered by app.js: ' + label);
+  });
+});
+
+test('tracker notes display bay, vehicle, technician, total and estimated completion', function () {
+  ['bayNumber', 'technicianName', 'estimatedTotal', 'Estimated completion'].forEach(function (token) {
+    assert.ok(APP_JS.indexOf(token) !== -1, 'tracker notes must include ' + token);
+  });
+  assert.ok(APP_JS.indexOf('Bay notes:') !== -1, 'technician bay notes must be shown');
+});
+
+test('tracker not-found feedback carries the shop phone; samples load the seed orders', function () {
+  assert.ok(APP_JS.indexOf('No work order found matching that code or phone number') !== -1,
+    'the not-found advisory must be present');
+  assert.ok(APP_JS.indexOf('(905) 846-8351') !== -1,
+    'the not-found advisory must include the Brampton shop phone');
+  assert.ok(APP_JS.indexOf('REV-2048') !== -1 && APP_JS.indexOf('REV-3105') !== -1,
+    'both quick sample buttons must reference the seed work orders');
+});
+
+test('appointment submission creates a work order with a Track My Vehicle Now link', function () {
+  assert.ok(APP_JS.indexOf('createWorkOrder') !== -1,
+    'booking submission must call createWorkOrder');
+  assert.ok(APP_JS.indexOf('state.workOrders.push') !== -1,
+    'created work orders must be stored in the workOrders array');
+  assert.ok(APP_JS.indexOf('Track My Vehicle Now') !== -1,
+    'the booking feedback must offer a Track My Vehicle Now link');
+  assert.ok(APP_JS.indexOf('Your live work order has been created:') !== -1,
+    'the generated REV-XXXX code must be displayed prominently');
+});
+
+test('app.js persists wizard, safety and work order state under the storage key', function () {
+  assert.ok(APP_JS.indexOf('revolutions_automotive_state_v1') !== -1);
+  ['wizardAnswers', 'wizardCurrentNodeId', 'safetyAnswers', 'workOrders', 'activeTrackedCode']
+    .forEach(function (key) {
+      assert.ok(APP_JS.indexOf(key) !== -1, 'state must persist ' + key);
+    });
+});
+
+test('simulation: a created work order is immediately trackable through lookupWorkOrder', function () {
+  var booking = {
+    customerName: 'Sim Bridge',
+    phone: '905-555-0177',
+    licensePlate: 'SIMB 177',
+    vehicleYear: 2019,
+    vehicleMake: 'Hyundai',
+    vehicleModel: 'Elantra',
+    origin: 'asian_import',
+    vehicleClass: 'sedan',
+    serviceIds: ['diag_computer_scan', 'brk_pads_rotors'],
+    appointmentDate: '2026-11-04',
+    appointmentTime: '09:30',
+    bookingMode: 'drop_off'
+  };
+  var validation = Engine.validateBooking(booking);
+  assert.strictEqual(validation.valid, true);
+  assert.deepStrictEqual(validation.errors, []);
+  var estimate = Engine.calculateEstimate({
+    serviceIds: booking.serviceIds,
+    origin: 'asian_import',
+    vehicleClass: 'sedan'
+  });
+  var workOrder = Engine.createWorkOrder(validation.normalizedBooking, estimate, {
+    nowTimestamp: '2026-11-04T09:30:00.000Z'
+  });
+  var pool = [workOrder];
+  assert.ok(/^REV-\d{4}$/.test(workOrder.code), 'bridge must generate a REV-XXXX code');
+  assert.strictEqual(workOrder.currentState, 'CHECKED_IN');
+  assert.strictEqual(Engine.lookupWorkOrder(workOrder.code.toLowerCase(), '', pool), workOrder,
+    'the created order must be trackable by code, case-insensitively');
+  assert.strictEqual(Engine.lookupWorkOrder('', workOrder.phone, pool), workOrder,
+    'the created order must be trackable by the customer phone');
+  assert.strictEqual(Engine.lookupWorkOrder(workOrder.code, workOrder.phone, pool), workOrder,
+    'the created order must verify against its own phone');
+  assert.strictEqual(Engine.lookupWorkOrder('REV-9999', '', pool), null,
+    'unknown codes must not resolve inside the custom pool');
+});
+
+test('simulation: the booking-to-tracker pool coexists with the seed work orders', function () {
+  var workOrder = Engine.createWorkOrder({
+    customerName: 'Pool Mate',
+    phone: '289-555-0166',
+    serviceIds: ['tir_mount_balance'],
+    appointmentDate: '2026-11-05',
+    appointmentTime: '10:00'
+  }, { estimatedTotal: 142.9 }, { nowTimestamp: '2026-11-05T10:00:00.000Z' });
+  var pool = [workOrder];
+  assert.ok(Engine.lookupWorkOrder('REV-2048', '', pool), 'seed REV-2048 must still resolve');
+  assert.strictEqual(Engine.lookupWorkOrder(workOrder.code, '', pool), workOrder,
+    'the user-created order must resolve alongside the seeds');
+  assert.notStrictEqual(workOrder.code, 'REV-2048');
+  assert.notStrictEqual(workOrder.code, 'REV-3105');
+  assert.notStrictEqual(workOrder.code, 'REV-4092');
+});
+
+/* ------------------------------------------------------------------ */
 /* report                                                              */
 /* ------------------------------------------------------------------ */
 

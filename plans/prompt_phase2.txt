@@ -1,0 +1,203 @@
+# PHASE 2 ARCHITECTURAL SPECIFICATION REQUEST — Revolutions Automotive
+
+## ROLE
+
+You are Gemini 4 Argon, the architect model. Produce the complete Phase 2
+roadmap as **pure Markdown only** — zero tool calls, zero executable code
+fences pretending to be run, zero external links used as instructions.
+Write the output to be saved as `plans/PHASE2_ROADMAP.md`.
+
+## MANDATORY ROADMAP STRUCTURE RULES
+
+- Phase 2 must be broken into exactly **3 bite-sized segments**.
+- **1–3 code files maximum per segment.** No segment may touch more than 3
+  code files.
+- Every segment must terminate in a **headless Node test gate** runnable in
+  a plain shell: `node test_revolutions.js`. No IDE features, no GUI tools,
+  no "looks good" gates.
+- Specify **exact DOM IDs/selectors** verbatim so the Segment 3 anti-drift
+  check can assert every selector queried in `app.js` exists in
+  `index.html`.
+- **Never weaken, delete, skip, or loosen any of the 91 existing tests** in
+  `test_revolutions.js`. Phase 2 tests are strictly additive (91 -> 116+).
+- Include a final **Stage 6 Audit Gate** segment: an independent Gemini 4
+  Argon audit of assertion integrity plus a git commit milestone.
+- The roadmap is pure Markdown. Include per-segment file inventory, exact
+  data schemas, function contracts, acceptance criteria, and the gate
+  command.
+
+## CLIENT CONTEXT
+
+- **Business:** Revolutions Automotive — Midas-style service, estimator &
+  appointment platform.
+- **Location:** 1-15A Fisherman Dr, Brampton, ON L7A 1B7
+- **Phone:** (905) 846-8351
+- **Specialties:** Auto repairs, auto maintenance, automobile air
+  conditioning (R134a & R1234yf), oil change (synthetic & conventional),
+  state-of-the-art computer diagnostics & repair, auto tune-ups, 4-wheel
+  laser alignments, brake services, tires (sales, mounting, balancing,
+  seasonal swap), suspensions & steering, exhaust systems, Ontario Safety
+  Standards Certificates (MTO SSC), domestic & import vehicles.
+- **Jurisdiction:** Ontario, Canada. CAD currency, 13% HST, shop supplies
+  capped at $35.00 CAD.
+
+## CURRENT PROJECT STATE (PHASE 1 — COMPLETE, 91/91 TESTS GREEN)
+
+- **Stack:** HTML5, CSS3, Vanilla ES6+ JavaScript, zero frameworks, zero
+  build step.
+- **Engine:** `revolutions_engine.js` — dual UMD module
+  (`window.RevolutionsEngine` in browser, `module.exports` in Node),
+  strict mode, zero dependencies. Already exports `SHOP_INFO`,
+  `VEHICLE_MULTIPLIERS`, `SERVICE_CATALOG` (12 services),
+  `COUPON_CATALOG` (5 codes), `calculateEstimate(options)`,
+  `validateBooking(bookingPayload)`,
+  `recommendServicesBySymptoms(symptomsArray)`.
+- **UI:** `index.html` (semantic responsive shell), `styles.css` (Midas
+  industrial gold / carbon-black / crimson theme), `app.js` (DOM
+  controller, `localStorage` key `revolutions_automotive_state_v1`).
+- **Assets:** `assets/hero_bay.jpg`, `assets/diagnostics_tech.jpg`,
+  `assets/safety_badge.jpg` (JPEG magic bytes `FF D8 FF` verified).
+- **Gate:** `node test_revolutions.js` — currently **91/91 PASSED**
+  (Segment 1: 68 engine tests; Segment 2: 14 asset/DOM tests; Segment 3: 9
+  controller & anti-drift tests).
+- **Persistence:** appointments and estimator state under
+  `revolutions_automotive_state_v1`.
+
+---
+
+## PHASE 2 SCOPE — SYMPTOM-TO-DIAGNOSTIC WIZARD, ONTARIO MTO SAFETY
+## CERTIFICATE PRE-CHECK & LIVE BAY TRACKER
+
+### SEGMENT 1 — ENGINE EXTENSIONS (`revolutions_engine.js` + `test_revolutions.js`)
+
+**Code files (2):** `revolutions_engine.js`, `test_revolutions.js`.
+Everything below is added to the existing dual UMD engine without touching
+existing exports or behavior.
+
+**New data structures:**
+
+1. `DIAGNOSTIC_DECISION_TREE` — frozen multi-step "What's That Noise /
+   Warning Light?" narrowing tree. Define its exact node schema (id, prompt
+   text, question type, options with next-node pointers, terminal diagnosis
+   nodes). Terminals must reference existing `SERVICE_CATALOG` service IDs
+   (e.g. `diag_computer_scan`, `diag_elec_parasitic`, `brk_pads_rotors`,
+   `tir_align_4whl`, `tune_spark_induction`) plus a triage outcome.
+2. `MTO_SSC_CHECKLIST_ITEMS` — frozen array covering exactly **11 Ontario
+   Safety Standards Certificate inspection areas** (brakes, tires, front
+   steering & suspension, rear suspension/frame, lighting, windshield &
+  glass, wipers, horn & signaling, mirrors, exhaust/emissions, body/
+   structural). Each item schema must include id, area label, plain-language
+   homeowner inspection question(s), weight, and severity classification.
+3. `SEED_WORK_ORDERS` — frozen array of at least 3 sample work orders in
+   different states, including at minimum:
+   - `REV-2048` — currently `IN_REPAIR_BAY`
+   - `REV-3105` — currently `PARTS_ORDERED`
+   - `REV-4092` — currently `READY_FOR_PICKUP`
+   Define the work-order state machine states: `CHECKED_IN`,
+   `ON_HOIST_DIAGNOSTICS`, `PARTS_ORDERED`, `IN_REPAIR_BAY`,
+   `QUALITY_ROAD_TEST`, `READY_FOR_PICKUP`.
+
+**New pure functions (exact contracts required in the roadmap):**
+
+1. `evaluateDiagnosticWizard(answersObject)` — returns
+   `{ triageLevel, likelyCauses, recommendedServiceId, technicianNotes }`
+   where `triageLevel` is exactly one of
+   `"tow_now" | "schedule_urgent" | "routine_inspect"`. Specify the input
+   answer-key schema and every decision rule.
+2. `evaluateSafetyPreCheck(answersObject)` — returns
+   `{ scorePercentage (0–100), status ("pass" | "fail" | "advisory"),
+      criticalFailures[], recommendedServices[] }`. Specify the exact
+   scoring formula (weighted items, critical-item auto-fail rules).
+3. `lookupWorkOrder(query, phoneOrPlate)` — matches a work order by code,
+   phone, or license plate; returns the full work-order object or `null`.
+   Specify matching rules and normalization (case, whitespace, plate
+   format).
+4. `createWorkOrder(bookingPayload, estimatePayload)` — builds a new
+   persistent work order with a unique `REV-XXXX` code (4-digit, zero
+   collision with seed codes), initial state `CHECKED_IN`, derived fields
+   from the booking and estimate payloads, and deterministic timestamp
+   handling (specify how, since `Date.now()` must remain testable).
+
+**Unit tests (additive only):** 25+ new headless `assert` assertions in
+`test_revolutions.js` raising the total from 91 to **116+**, covering all
+four functions, all data structure invariants, the state machine, and edge
+cases (unknown query, invalid answers, tow_now triggers, 0 and 100 scores,
+work-order code uniqueness).
+
+**Gate:** `node test_revolutions.js` — 116+ PASSED, zero prior tests
+removed or weakened.
+
+### SEGMENT 2 — PHASE 2 UI SECTIONS (`index.html` + `styles.css`)
+
+**Code files (3):** `index.html`, `styles.css`, `test_revolutions.js`
+(appended DOM presence tests only).
+
+Build responsive, mobile-first, accessible sections consistent with the
+existing Midas industrial theme, with these **exact DOM IDs verbatim**:
+
+- **Diagnostic Wizard:**
+  `#wizard-container`, `#wizard-step-indicator`, `#wizard-options`,
+  `#wizard-result-card`, `#btn-wizard-add-service`
+- **Ontario Safety Standards Pre-Check:**
+  `#safety-checklist-container`, `#safety-score-gauge`,
+  `#safety-summary-alert`, `#btn-safety-book-inspection`
+- **Live Bay Tracker ("Track My Vehicle"):**
+  `#tracker-input-code`, `#tracker-input-phone`, `#btn-track-vehicle`,
+  `#tracker-status-timeline`, `#tracker-technician-notes`,
+  `#btn-track-sample-1`, `#btn-track-sample-2`
+
+The roadmap must tabulate every ID with its semantic purpose and require
+`test_revolutions.js` DOM presence assertions for all of them (additive),
+mirroring the Phase 1 Segment 2 pattern. The 6-state bay progress timeline
+must be renderable from the work-order state machine.
+
+**Gate:** `node test_revolutions.js` — all Phase 1 + Phase 2 DOM tests
+green.
+
+### SEGMENT 3 — INTERACTIVE WIRING (`app.js` + ANTI-DRIFT TESTS)
+
+**Code files (2):** `app.js`, `test_revolutions.js`.
+
+- Wire the wizard step flow: step indicator, option rendering from
+  `DIAGNOSTIC_DECISION_TREE`, back/restart, result card showing
+  `evaluateDiagnosticWizard` output, and `#btn-wizard-add-service`
+  auto-populating the Phase 1 estimator with the recommended service.
+- Wire the safety checklist: dynamic rendering of all 11 MTO items, live
+  score gauge + summary alert from `evaluateSafetyPreCheck`, failed items
+  suggesting corrective services, and `#btn-safety-book-inspection`
+  scrolling to the booking form.
+- Wire the bay tracker: `#btn-track-vehicle` calling `lookupWorkOrder`,
+  6-state visual timeline, technician notes panel, and the two sample
+  buttons (`#btn-track-sample-1`, `#btn-track-sample-2`) pre-filling seed
+  orders `REV-2048` and `REV-3105`.
+- **Appointment-to-tracker integration:** submitting the Phase 1 booking
+  form calls `createWorkOrder` and immediately offers tracking of the new
+  code; work orders persist to `localStorage` under
+  `revolutions_automotive_state_v1`.
+- **Anti-drift gate:** extend the existing static regex/AST anti-drift test
+  so every Phase 2 DOM ID queried in `app.js` exists verbatim in
+  `index.html`, and vice versa for the Phase 2 section. Never weaken the
+  existing Phase 1 anti-drift assertions.
+
+**Gate:** `node test_revolutions.js` — full regression green.
+
+### STAGE 6 AUDIT GATE
+
+After Segment 3, an independent Gemini 4 Argon audit must verify:
+- All 91 pre-Phase 2 assertions are byte-identical in intent — none
+  deleted, skipped, broadened, or loosened.
+- The final suite went green only through genuine additive tests.
+- The anti-drift DOM check covers every Phase 2 selector.
+- Verdict line format: `AUDIT VERDICT: PASS` or `AUDIT VERDICT: FAIL`.
+- End with the git commit milestone command sequence (no redirects, no
+  shell variables — plain commands only).
+
+---
+
+## OUTPUT
+
+Write `plans/PHASE2_ROADMAP.md` as pure Markdown containing: context recap,
+the 3-segment plan with exact file inventories, complete data schemas and
+function contracts, full DOM ID tables, per-segment acceptance criteria and
+gate commands, the test-count trajectory (91 -> 116+), and the Stage 6
+audit gate specification.

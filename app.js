@@ -23,7 +23,12 @@
     appointmentDate: '',
     appointmentTime: '',
     bookingMode: 'drop_off',
-    lastConfirmedBooking: null
+    lastConfirmedBooking: null,
+    wizardAnswers: {},
+    wizardCurrentNodeId: 'step_anomaly',
+    safetyAnswers: {},
+    workOrders: [],
+    activeTrackedCode: 'REV-2048'
   };
 
   /* -------------------------------------------------------------- */
@@ -441,7 +446,12 @@
       renderBookingFeedback(result, true);
       if (result.valid) {
         state.lastConfirmedBooking = result.normalizedBooking;
+        var estimate = recalculateAndRenderEstimate();
+        var workOrder = Engine.createWorkOrder(bookingPayload(), estimate);
+        state.workOrders.push(workOrder);
+        state.activeTrackedCode = workOrder.code;
         saveState();
+        renderWorkOrderConfirmation(workOrder);
       }
     });
   }
@@ -560,6 +570,423 @@
   }
 
   /* -------------------------------------------------------------- */
+  /* Phase 2: Diagnostic wizard                                      */
+  /* -------------------------------------------------------------- */
+
+  var WIZARD_STEP_PROMPTS = {
+    1: 'Step 1 of 3: Select Anomaly Type',
+    2: 'Step 2 of 3: Identify Location',
+    3: 'Step 3 of 3: Driving Condition'
+  };
+
+  var TRIAGE_BADGE_CLASSES = {
+    tow_now: 'triage-badge triage-tow_now',
+    schedule_urgent: 'triage-badge triage-schedule_urgent',
+    routine_inspect: 'triage-badge triage-routine_inspect'
+  };
+
+  function findServiceById(serviceId) {
+    var match = Engine.SERVICE_CATALOG.filter(function (svc) { return svc.id === serviceId; });
+    return match.length > 0 ? match[0] : null;
+  }
+
+  function resetWizard() {
+    state.wizardAnswers = {};
+    state.wizardCurrentNodeId = Engine.DIAGNOSTIC_DECISION_TREE.rootNodeId;
+    saveState();
+    renderWizardStep();
+  }
+
+  function renderWizardStep() {
+    var node = Engine.DIAGNOSTIC_DECISION_TREE.nodes[state.wizardCurrentNodeId];
+    if (!node) {
+      resetWizard();
+      return;
+    }
+    var container = document.getElementById('wizard-container');
+    var indicator = document.getElementById('wizard-step-indicator');
+    var optionsBox = document.getElementById('wizard-options');
+    var resultCard = document.getElementById('wizard-result-card');
+
+    container.dataset.currentNodeId = state.wizardCurrentNodeId;
+    optionsBox.innerHTML = '';
+    resultCard.hidden = true;
+
+    if (node.type === 'question') {
+      indicator.textContent = WIZARD_STEP_PROMPTS[node.stepNumber] || WIZARD_STEP_PROMPTS[3];
+      node.options.forEach(function (option) {
+        var card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'wizard-option';
+        card.textContent = option.label;
+        card.addEventListener('click', function () {
+          state.wizardAnswers[node.answerKey] = option.value;
+          state.wizardCurrentNodeId = option.nextNodeId;
+          saveState();
+          renderWizardStep();
+        });
+        optionsBox.appendChild(card);
+      });
+      return;
+    }
+    renderWizardResult();
+  }
+
+  function renderWizardResult() {
+    var outcome = Engine.evaluateDiagnosticWizard(state.wizardAnswers);
+    var service = findServiceById(outcome.serviceId);
+    var indicator = document.getElementById('wizard-step-indicator');
+    var optionsBox = document.getElementById('wizard-options');
+    var resultCard = document.getElementById('wizard-result-card');
+    var addButton = document.getElementById('btn-wizard-add-service');
+
+    indicator.textContent = 'Diagnosis complete - ' + (service ? service.name : outcome.serviceId);
+    optionsBox.innerHTML = '';
+    resultCard.innerHTML = '';
+
+    var badge = document.createElement('span');
+    badge.className = TRIAGE_BADGE_CLASSES[outcome.triageLevel] || TRIAGE_BADGE_CLASSES.routine_inspect;
+    badge.textContent = outcome.triageLevel.replace(/_/g, ' ').toUpperCase();
+    resultCard.appendChild(badge);
+
+    var urgency = document.createElement('p');
+    urgency.className = 'wizard-tech-notes';
+    urgency.textContent = outcome.recommendedUrgency;
+    resultCard.appendChild(urgency);
+
+    var causeTitle = document.createElement('h4');
+    causeTitle.textContent = 'Probable Root Causes';
+    resultCard.appendChild(causeTitle);
+
+    var causes = document.createElement('ul');
+    causes.className = 'wizard-cause-list';
+    outcome.rootCauses.forEach(function (cause) {
+      var li = document.createElement('li');
+      li.textContent = cause;
+      causes.appendChild(li);
+    });
+    resultCard.appendChild(causes);
+
+    var recommended = document.createElement('p');
+    recommended.textContent = 'Recommended service: ' +
+      (service ? service.name + ' (' + service.category + ')' : outcome.serviceId);
+    resultCard.appendChild(recommended);
+
+    var notes = document.createElement('p');
+    notes.className = 'wizard-tech-notes';
+    notes.textContent = 'Technician notes: ' + outcome.technicianNotes;
+    resultCard.appendChild(notes);
+
+    addButton.dataset.recommendedServiceId = outcome.serviceId;
+    resultCard.appendChild(addButton);
+
+    var startOver = document.createElement('button');
+    startOver.type = 'button';
+    startOver.className = 'btn btn-sample-alt';
+    startOver.textContent = 'Start Over';
+    startOver.addEventListener('click', function () {
+      resetWizard();
+    });
+    resultCard.appendChild(startOver);
+
+    resultCard.hidden = false;
+  }
+
+  function bindWizard() {
+    document.getElementById('btn-wizard-add-service').addEventListener('click', function () {
+      var addButton = document.getElementById('btn-wizard-add-service');
+      var serviceId = addButton.dataset.recommendedServiceId;
+      if (!serviceId) return;
+      addServices([serviceId]);
+      var service = findServiceById(serviceId);
+      document.getElementById('wizard-step-indicator').textContent =
+        'Added to estimate: ' + (service ? service.name : serviceId) + ' - see the live estimate breakdown.';
+      document.getElementById('estimate-summary-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    renderWizardStep();
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Phase 2: Ontario MTO safety pre-check                          */
+  /* -------------------------------------------------------------- */
+
+  var SAFETY_ANSWER_VALUES = { pass: true, fail: false, unsure: 'unsure' };
+
+  var SAFETY_TOGGLE_DEFS = [
+    { choice: 'pass', className: 'toggle-pass', label: 'Pass' },
+    { choice: 'fail', className: 'toggle-fail', label: 'Fail' },
+    { choice: 'unsure', className: 'toggle-unsure', label: 'Unsure' }
+  ];
+
+  function safetyVerdictClass(status) {
+    if (status === 'pass') return 'is-pass';
+    if (status === 'advisory') return 'is-advisory';
+    return 'is-fail';
+  }
+
+  function gaugeColor(status) {
+    if (status === 'pass') return 'var(--emerald)';
+    if (status === 'advisory') return 'var(--gold)';
+    return 'var(--crimson)';
+  }
+
+  function renderSafetyChecklist() {
+    var container = document.getElementById('safety-checklist-container');
+    container.innerHTML = '';
+    Engine.MTO_SSC_CHECKLIST_ITEMS.forEach(function (item) {
+      var card = document.createElement('article');
+      card.className = 'safety-item';
+
+      var text = document.createElement('div');
+      text.className = 'safety-item-text';
+      var title = document.createElement('h4');
+      title.className = 'safety-item-title';
+      title.textContent = item.areaLabel;
+      var sev = document.createElement('span');
+      sev.className = 'sev-' + item.severity;
+      sev.textContent = ' [' + item.severity.toUpperCase() + ']';
+      title.appendChild(sev);
+      var question = document.createElement('p');
+      question.className = 'safety-item-question';
+      question.textContent = item.question;
+      text.appendChild(title);
+      text.appendChild(question);
+
+      var toggles = document.createElement('div');
+      toggles.className = 'safety-toggle-group';
+      SAFETY_TOGGLE_DEFS.forEach(function (def) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'safety-toggle ' + def.className;
+        btn.textContent = def.label;
+        var current = state.safetyAnswers[item.id];
+        var isActive = (def.choice === 'pass' && current === true) ||
+          (def.choice === 'fail' && current === false) ||
+          (def.choice === 'unsure' && current === 'unsure');
+        if (isActive) btn.classList.add('active');
+        btn.addEventListener('click', function () {
+          state.safetyAnswers[item.id] = SAFETY_ANSWER_VALUES[def.choice];
+          saveState();
+          renderSafetyChecklist();
+          renderSafetyVerdict();
+        });
+        toggles.appendChild(btn);
+      });
+
+      card.appendChild(text);
+      card.appendChild(toggles);
+      container.appendChild(card);
+    });
+  }
+
+  function renderSafetyVerdict() {
+    var evaluation = Engine.evaluateSafetyPreCheck(state.safetyAnswers);
+    var gauge = document.getElementById('safety-score-gauge');
+    var alertBox = document.getElementById('safety-summary-alert');
+
+    gauge.classList.remove('is-pass', 'is-advisory', 'is-fail');
+    gauge.classList.add(safetyVerdictClass(evaluation.status));
+    gauge.style.background =
+      'radial-gradient(closest-side, var(--surface-2) 79%, transparent 80% 100%),' +
+      'conic-gradient(' + gaugeColor(evaluation.status) + ' ' + evaluation.score + '%, var(--surface-2) 0)';
+    gauge.querySelector('.gauge-percent').textContent = evaluation.score + '%';
+
+    alertBox.classList.remove('is-pass', 'is-advisory', 'is-fail');
+    alertBox.classList.add(safetyVerdictClass(evaluation.status));
+    alertBox.innerHTML = '';
+
+    var verdict = document.createElement('p');
+    verdict.style.margin = '0 0 0.35rem';
+    verdict.textContent = evaluation.status.toUpperCase() + ' - Score ' + evaluation.score + '%. ' + evaluation.notes;
+    alertBox.appendChild(verdict);
+
+    if (evaluation.criticalFails.length > 0) {
+      var critical = document.createElement('p');
+      critical.style.margin = '0 0 0.35rem';
+      critical.style.fontWeight = '700';
+      critical.textContent = 'Instant-fail for Ontario MTO certification: ' +
+        evaluation.criticalFails.map(function (fail) { return fail.areaLabel; }).join(', ') +
+        '. Critical defects must be repaired before a Safety Standards Certificate can be issued - this includes used-vehicle sales and Brampton rideshare licensing.';
+      alertBox.appendChild(critical);
+    }
+
+    if (evaluation.recommendedServiceIds.length > 0) {
+      var recs = document.createElement('p');
+      recs.style.margin = '0';
+      recs.textContent = 'Recommended corrective services: ' + evaluation.recommendedServiceIds.map(function (id) {
+        var svc = findServiceById(id);
+        return svc ? svc.name : id;
+      }).join('; ') + '.';
+      alertBox.appendChild(recs);
+    }
+  }
+
+  function bindSafetyPreCheck() {
+    document.getElementById('btn-safety-book-inspection').addEventListener('click', function () {
+      var evaluation = Engine.evaluateSafetyPreCheck(state.safetyAnswers);
+      addServices(['mto_safety_exhaust'].concat(evaluation.recommendedServiceIds));
+      document.getElementById('booking-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('cust-name').focus();
+    });
+    renderSafetyChecklist();
+    renderSafetyVerdict();
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Phase 2: Live repair bay & work order tracker                   */
+  /* -------------------------------------------------------------- */
+
+  var TIMELINE_LABELS = [
+    'Checked In',
+    'Inspection & Diagnostics',
+    'Parts Ordered',
+    'In Bay / Repairing',
+    'Quality & Alignment',
+    'Ready for Pickup'
+  ];
+
+  var STAGE_ETA = {
+    CHECKED_IN: 'Estimated completion: 1-2 business days.',
+    INSPECTION_DIAGNOSTIC: 'Estimated completion: 1-2 business days.',
+    PARTS_ORDERED: 'Estimated completion: later today or tomorrow, depending on parts arrival.',
+    IN_BAY_REPAIRING: 'Estimated completion: end of day.',
+    QUALITY_ALIGNMENT_TEST: 'Estimated completion: within the hour.',
+    READY_FOR_PICKUP: 'Ready for pickup now.'
+  };
+
+  function renderTimeline(workOrder) {
+    var timeline = document.getElementById('tracker-status-timeline');
+    timeline.innerHTML = '';
+    var currentIndex = workOrder ? Engine.WORK_ORDER_STATES.indexOf(workOrder.currentState) : -1;
+    Engine.WORK_ORDER_STATES.forEach(function (stageName, index) {
+      var li = document.createElement('li');
+      li.className = 'tl-step';
+      if (currentIndex === -1 || index > currentIndex) {
+        li.classList.add('is-pending');
+      } else if (index < currentIndex) {
+        li.classList.add('is-complete');
+      } else {
+        li.classList.add('is-active');
+      }
+      li.textContent = TIMELINE_LABELS[index];
+      timeline.appendChild(li);
+    });
+  }
+
+  function renderTechnicianNotes(workOrder) {
+    var panel = document.getElementById('tracker-technician-notes');
+    panel.innerHTML = '';
+
+    var title = document.createElement('p');
+    title.className = 'tracker-notes-title';
+    title.textContent = 'Work Order ' + workOrder.code + ' - ' + workOrder.currentState.replace(/_/g, ' ');
+    panel.appendChild(title);
+
+    var meta = document.createElement('p');
+    meta.className = 'tracker-notes-meta';
+    meta.textContent = workOrder.vehicle + ' (' + workOrder.vehicleType + ') for ' +
+      workOrder.customerName + ' - Plate ' + workOrder.licensePlate + '.';
+    panel.appendChild(meta);
+
+    var bay = document.createElement('p');
+    bay.className = 'tracker-notes-meta';
+    bay.textContent = 'Bay: ' + workOrder.bayNumber + ' | Technician: ' + workOrder.technicianName +
+      ' | Estimated total: ' + fmtCAD(workOrder.estimatedTotal) + '.';
+    panel.appendChild(bay);
+
+    var services = document.createElement('p');
+    services.className = 'tracker-notes-meta';
+    services.textContent = 'Services: ' + workOrder.serviceIds.map(function (id) {
+      var svc = findServiceById(id);
+      return svc ? svc.name : id;
+    }).join('; ') + '.';
+    panel.appendChild(services);
+
+    var eta = document.createElement('p');
+    eta.className = 'tracker-notes-meta';
+    eta.textContent = STAGE_ETA[workOrder.currentState] || 'Estimated completion: call the shop for details.';
+    panel.appendChild(eta);
+
+    var notes = document.createElement('p');
+    notes.textContent = 'Bay notes: ' + workOrder.technicianNotes;
+    panel.appendChild(notes);
+  }
+
+  function trackVehicle(code, phoneOrPlate) {
+    var feedback = document.getElementById('tracker-feedback');
+    var workOrder = Engine.lookupWorkOrder(code, phoneOrPlate, state.workOrders);
+
+    if (!workOrder) {
+      renderTimeline(null);
+      document.getElementById('tracker-technician-notes').innerHTML = '';
+      feedback.innerHTML = '';
+      var miss = document.createElement('div');
+      miss.className = 'feedback-error';
+      miss.textContent = 'No work order found matching that code or phone number. Call our Brampton shop at (905) 846-8351 for live bay updates.';
+      feedback.appendChild(miss);
+      return null;
+    }
+
+    state.activeTrackedCode = workOrder.code;
+    saveState();
+    renderTimeline(workOrder);
+    renderTechnicianNotes(workOrder);
+    feedback.innerHTML = '';
+    document.getElementById('tracker-input-code').value = workOrder.code;
+    return workOrder;
+  }
+
+  function bindBayTracker() {
+    document.getElementById('btn-track-vehicle').addEventListener('click', function () {
+      trackVehicle(
+        document.getElementById('tracker-input-code').value,
+        document.getElementById('tracker-input-phone').value
+      );
+    });
+    document.getElementById('btn-track-sample-1').addEventListener('click', function () {
+      document.getElementById('tracker-input-code').value = 'REV-2048';
+      document.getElementById('tracker-input-phone').value = '';
+      trackVehicle('REV-2048', '');
+    });
+    document.getElementById('btn-track-sample-2').addEventListener('click', function () {
+      document.getElementById('tracker-input-code').value = 'REV-3105';
+      document.getElementById('tracker-input-phone').value = '';
+      trackVehicle('REV-3105', '');
+    });
+    trackVehicle(state.activeTrackedCode || 'REV-2048', '');
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Phase 2: Appointment-to-tracker bridge                          */
+  /* -------------------------------------------------------------- */
+
+  function renderWorkOrderConfirmation(workOrder) {
+    var box = document.getElementById('booking-feedback');
+    var panel = document.createElement('div');
+    panel.className = 'feedback-success';
+
+    var codeLine = document.createElement('p');
+    codeLine.style.margin = '0 0 0.4rem';
+    codeLine.textContent = 'Your live work order has been created: ' + workOrder.code +
+      ' (' + workOrder.currentState.replace(/_/g, ' ') + ', ' + workOrder.bayNumber + ').';
+    panel.appendChild(codeLine);
+
+    var trackBtn = document.createElement('button');
+    trackBtn.type = 'button';
+    trackBtn.className = 'btn btn-primary';
+    trackBtn.textContent = 'Track My Vehicle Now';
+    trackBtn.addEventListener('click', function () {
+      document.getElementById('tracker-input-code').value = workOrder.code;
+      document.getElementById('tracker-input-phone').value = '';
+      trackVehicle(workOrder.code, '');
+      document.getElementById('bay-tracker-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    panel.appendChild(trackBtn);
+
+    box.appendChild(panel);
+  }
+
+  /* -------------------------------------------------------------- */
   /* Init                                                             */
   /* -------------------------------------------------------------- */
 
@@ -579,6 +1006,9 @@
     bindCouponSelect();
     bindBookingInputs();
     bindLoadSample();
+    bindWizard();
+    bindSafetyPreCheck();
+    bindBayTracker();
     syncVehicleAndCouponInputs();
     syncBookingInputs();
     renderAll();

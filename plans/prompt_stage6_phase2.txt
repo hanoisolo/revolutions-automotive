@@ -1,0 +1,102 @@
+# STAGE 6 AUDIT REQUEST — REVOLUTIONS AUTOMOTIVE PHASE 2
+
+## ROLE
+
+You are Gemini 4 Argon acting as the independent Stage 6 auditor for the
+completed Phase 2 implementation of the Revolutions Automotive platform
+(1-15A Fisherman Dr, Brampton, ON L7A 1B7, (905) 846-8351). The attached
+files are the five implementation artifacts plus this audit runs against
+`plans/PHASE2_ROADMAP.md`. Produce the audit report as pure Markdown to be
+saved as `plans/stage6_phase2_audit.md`.
+
+## BASELINE FACTS
+
+- Phase 1 baseline: 91 headless assertions (`node test_revolutions.js`).
+- Phase 2 planned additions per the roadmap: Segment 1 (+26 engine tests,
+  target total 117), Segment 2 (+15 DOM tests, target 132), Segment 3
+  (+10 controller & anti-drift tests, target 142).
+- Actual delivered totals: Segment 1 added 27 tests, Segment 2 added 15
+  tests, Segment 3 added 15 tests. Final gate output: **148/148 PASSED,
+  TEST GATE GREEN**.
+- Phase 2 implementation deliberately deviates from the original roadmap
+  in three user-approved ways: the work-order lifecycle state names are
+  `CHECKED_IN`, `INSPECTION_DIAGNOSTIC`, `PARTS_ORDERED`, `IN_BAY_REPAIRING`,
+  `QUALITY_ALIGNMENT_TEST`, `READY_FOR_PICKUP`; the seed work orders are
+  `REV-2048` (2020 Honda Civic, in bay), `REV-3105` (2018 Ford F-150 A/C
+  compressor, parts ordered), `REV-4092` (2022 Toyota RAV4 MTO SSC + oil,
+  ready for pickup); and an extra `#tracker-feedback` alert box was
+  specified. These deviations are accepted scope, not defects.
+
+## AUDIT CHECKLIST — VERIFY EACH ITEM STRICTLY
+
+1. **Assertion Integrity (zero tolerance).** Confirm that:
+   - ALL 91 Phase 1 assertions remain intact and unweakened: no test was
+     deleted, skipped, commented out, broadened, or had its `assert`
+     strictness reduced. The Phase 1 groups are: SHOP_INFO (5),
+     SERVICE_CATALOG / COUPON_CATALOG (6), calculateEstimate base math (12),
+     multipliers (4), coupons (11), validateBooking (22),
+     recommendServicesBySymptoms (8), Segment 2 Assets & DOM (14),
+     Segment 3 Controller & Anti-Drift (9).
+   - All 27 Phase 2 Segment 1 assertions, all 15 Segment 2 assertions, and
+     all 15 Segment 3 assertions are genuine additive coverage of
+     `DIAGNOSTIC_DECISION_TREE`, `MTO_SSC_CHECKLIST_ITEMS`, `WORK_ORDER_STATES`,
+     `SEED_WORK_ORDERS`, `evaluateDiagnosticWizard`, `evaluateSafetyPreCheck`,
+     `lookupWorkOrder`, `createWorkOrder`, the 17 contract DOM IDs, and the
+     app.js <-> index.html selector parity — not restatements of Phase 1
+     checks or vacuous assertions.
+
+2. **Diagnostic Wizard decision tree.** Verify the traversal logic in
+   `revolutions_engine.js` (`evaluateDiagnosticWizard`) and the controller
+   in `app.js`: every option `nextNodeId` resolves to an existing node, and
+   every terminal node's `serviceId` links verbatim to an ID present in
+   `SERVICE_CATALOG` (e.g. `diag_computer_scan`, `brk_pads_rotors`,
+   `tir_align_4whl`, `ac_evac_recharge`, `mto_safety_exhaust`,
+   `sus_strut_control`, `ac_compressor_cond`, `brk_fluid_caliper`,
+   `tir_mount_balance`, `oil_full_synth`, `tune_spark_induction`,
+   `diag_elec_parasitic`).
+
+3. **MTO Safety Pre-Check math.** Verify the 11-item checklist weights sum
+   to exactly 100, the severity tiers are `critical` / `major` / `minor`,
+   the scoring awards full weight on pass, half weight on unsure, and zero
+   on fail, and that any critical failure forces `status: "fail"` (with
+   score 85 or above) per the pass >= 85 / advisory 70-84 / fail < 70 or
+   any-critical-fail rules.
+
+4. **Work order timeline and lookup.** Verify the 6-state lifecycle
+   definition, the seed orders `REV-2048` / `REV-3105` / `REV-4092`, the
+   case-insensitive code normalization (including bare 4-digit numbers),
+   phone (full 10 digits or last 4) and plate matching, the secondary
+   verification rejection path, and the `createWorkOrder` REV-XXXX code
+   generation that never collides with seed codes.
+
+5. **Anti-drift zero tolerance.** Verify every DOM ID referenced in
+   `app.js` via `getElementById('...')`, `querySelector('#...')`, or
+   `querySelectorAll('#...')` exists verbatim as `id="..."` in
+   `index.html`, and that all 17 Phase 2 interactive DOM IDs
+   (`wizard-container`, `wizard-step-indicator`, `wizard-options`,
+   `wizard-result-card`, `btn-wizard-add-service`,
+   `safety-checklist-container`, `safety-score-gauge`,
+   `safety-summary-alert`, `btn-safety-book-inspection`,
+   `tracker-input-code`, `tracker-input-phone`, `btn-track-vehicle`,
+   `tracker-status-timeline`, `tracker-technician-notes`,
+   `btn-track-sample-1`, `btn-track-sample-2`, `tracker-feedback`) are both
+   present in `index.html` and wired in `app.js`.
+
+6. **Secret hygiene.** Confirm none of the attached files contain secret
+   markers (`AIza`, `sk-`, `ghp_`, or a `GEMINI_API_KEY` assignment with a
+   literal key value).
+
+## OUTPUT FORMAT
+
+Write a structured audit report with one section per checklist item, each
+with a PASS / FAIL verdict and a one-paragraph justification, then a final
+summary section. The report MUST end with exactly one final line:
+
+`AUDIT VERDICT: PASS`
+
+or
+
+`AUDIT VERDICT: FAIL`
+
+If any item fails, list the exact file, the exact defect, and the minimal
+remediation required.

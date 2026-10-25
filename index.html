@@ -27,9 +27,12 @@
     </div>
     <nav class="quick-nav" aria-label="Page sections">
       <a href="#symptom-section">Symptom Checker</a>
+      <a href="#wizard-section">Noise Wizard</a>
       <a href="#catalog-section">Services</a>
+      <a href="#safety-precheck-section">MTO Pre-Check</a>
       <a href="#coupon-section">Coupons</a>
       <a href="#booking-section">Book a Bay</a>
+      <a href="#bay-tracker-section">Track My Vehicle</a>
       <a href="#safety-showcase">MTO Safety Certificate</a>
     </nav>
   </header>
@@ -93,6 +96,38 @@
       </header>
       <div id="symptom-chips" class="chip-row" aria-label="Vehicle symptoms"></div>
       <div id="symptom-recommendations" class="symptom-recommendations" aria-live="polite"></div>
+    </section>
+
+    <section class="section" id="wizard-section">
+      <header class="section-head">
+        <h2>What&rsquo;s That Noise / Warning Light?</h2>
+        <p>Answer two quick questions and our diagnostic wizard triages the symptom &mdash; tow-in emergency, urgent booking or routine inspection &mdash; with likely root causes and Red Seal technician notes. Finish the wizard to add the recommended diagnostic service straight to your live estimate.</p>
+      </header>
+      <div id="wizard-container" class="wizard-container" role="region" aria-label="Interactive diagnostic wizard">
+        <div id="wizard-step-indicator" class="wizard-step-indicator" aria-live="polite">Step 1 of 3 &mdash; Select the anomaly you are experiencing</div>
+        <div id="wizard-options" class="wizard-options" role="group" aria-label="Diagnostic wizard answer options"></div>
+        <div id="wizard-result-card" class="wizard-result-card" aria-live="polite" hidden>
+          <button id="btn-wizard-add-service" type="button" class="btn btn-wizard-cta">Add Diagnostic Service to Estimate</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="safety-precheck-section">
+      <header class="section-head">
+        <h2>Ontario Safety Standards Certificate (MTO SSC) Pre-Check</h2>
+        <p>Selling or registering a used vehicle, or driving for a rideshare platform in Brampton? Walk the 11 official MTO inspection areas with our interactive pre-check and see your readiness score before booking the certification inspection at 1-15A Fisherman Dr.</p>
+      </header>
+      <div class="safety-layout">
+        <div id="safety-checklist-container" class="safety-checklist-container" aria-label="Ontario MTO inspection pre-check checklist"></div>
+        <aside class="safety-verdict" aria-label="Readiness verdict">
+          <div id="safety-score-gauge" class="safety-score-gauge" role="status">
+            <span class="gauge-percent">0%</span>
+            <span class="gauge-label">Readiness Score</span>
+          </div>
+          <div id="safety-summary-alert" class="safety-summary-alert" aria-live="polite"></div>
+          <button id="btn-safety-book-inspection" type="button" class="btn btn-primary">Book Official MTO Safety Inspection</button>
+        </aside>
+      </div>
     </section>
 
     <section class="section" id="catalog-section">
@@ -180,6 +215,40 @@
         </form>
       </section>
     </div>
+
+    <section class="section" id="bay-tracker-section">
+      <header class="section-head">
+        <h2>Track My Vehicle &mdash; Live Repair Bay Status</h2>
+        <p>Follow your repair across our six shop stages, from check-in on Fisherman Dr to the quality road test and pickup. Enter your work order code together with your phone or plate to verify, or load a live sample order.</p>
+      </header>
+      <div class="tracker-panel">
+        <div class="tracker-form">
+          <div class="tracker-field">
+            <label for="tracker-input-code">Work Order Code</label>
+            <input id="tracker-input-code" type="text" placeholder="REV-2048" autocomplete="off">
+          </div>
+          <div class="tracker-field">
+            <label for="tracker-input-phone">Phone or Plate</label>
+            <input id="tracker-input-phone" type="text" placeholder="Phone or Plate" autocomplete="off">
+          </div>
+          <button id="btn-track-vehicle" type="button" class="btn btn-primary btn-track">Track My Vehicle</button>
+        </div>
+        <div class="tracker-samples">
+          <button id="btn-track-sample-1" type="button" class="btn btn-sample-alt">Load REV-2048: In Bay</button>
+          <button id="btn-track-sample-2" type="button" class="btn btn-sample-alt">Load REV-3105: Parts Ordered</button>
+        </div>
+        <div id="tracker-feedback" class="tracker-feedback" aria-live="polite"></div>
+        <ol id="tracker-status-timeline" class="tracker-status-timeline" aria-label="Repair progress stages">
+          <li class="tl-step">Checked In</li>
+          <li class="tl-step">Inspection &amp; Diagnostics</li>
+          <li class="tl-step">Parts Ordered</li>
+          <li class="tl-step">In Bay / Repairing</li>
+          <li class="tl-step">Quality &amp; Alignment</li>
+          <li class="tl-step">Ready for Pickup</li>
+        </ol>
+        <div id="tracker-technician-notes" class="tracker-technician-notes" aria-live="polite"></div>
+      </div>
+    </section>
 
     <section class="section showcase" id="safety-showcase">
       <article class="showcase-card">
