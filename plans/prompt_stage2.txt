@@ -1,0 +1,129 @@
+You are Gemini 4 Argon, acting as the architect model for a 6-stage segmented build.
+Produce ONE response: pure Markdown only. Zero tool calls, zero executable code
+fences pretending to run, no external links as instructions.
+
+Produce a complete 3-Phase Master Roadmap PLUS a granular,
+implementation-ready Phase 1 Blueprint for the web platform below.
+
+## Output Constraints (must be satisfied exactly)
+
+- Pure Markdown only. Zero tool calls, zero executable blocks.
+- Break the roadmap into Phases of 3 segments each.
+- 1-3 code files maximum per segment.
+- Every segment ends in a headless Node test gate runnable in a plain shell
+  (the canonical gate is `node test_revolutions.js`).
+- For web UI work, specify exact DOM IDs/selectors that `index.html` and
+  `app.js` share, so the Segment 3 anti-drift DOM check can assert every
+  selector queried in `app.js` exists verbatim in `index.html`.
+
+## Client Profile
+
+- **Business Name:** Revolutions Automotive
+- **Address:** 1-15A Fisherman Dr, Brampton, ON L7A 1B7
+- **Phone:** (905) 846-8351
+- **Specialties:** Auto Repairs, Auto Maintenance, Automobile Air Conditioning
+  (R134a & R1234yf), Oil Change (Synthetic & Conventional), State-of-the-Art
+  Computer Diagnostics & Repair, Auto Tune-Ups, 4-Wheel Laser Alignments,
+  Brake Services, Tires (Sales, Mounting, Balancing, Seasonal Swap),
+  Suspensions & Steering, Exhaust Systems, Ontario Safety Standards
+  Certificates (MTO SSC), Domestic & Import Vehicles.
+
+## Active Stack (fixed, do not change)
+
+- HTML5, CSS3, Vanilla ES6+ JavaScript (no frameworks, no build step).
+- Dual UMD engine `revolutions_engine.js` (`window.RevolutionsEngine` for
+  browser, `module.exports` for Node).
+- Headless Node `assert` test suite `test_revolutions.js`.
+- Custom AI-generated `.jpg` assets via `python ..\generate_image.py`.
+
+## 3-Phase Master Overview
+
+- **Phase 1 (MVP):** Midas-Style Service Hub, Interactive Multi-Service &
+  Diagnostic Estimator (with Ontario 13% HST, shop supplies cap,
+  multi-service combo labor discount, Domestic/Import/SUV/Truck multipliers),
+  Midas-Style Coupon Wallet, and Bay Appointment Booking Engine.
+- **Phase 2:** Symptom-to-Diagnostic Interactive Wizard ("What's That
+  Noise/Warning Light?"), Ontario Safety Standards Certificate (MTO SSC)
+  Pre-Check Interactive Checklist, and Live Work Order Bay Tracker
+  ("Track My Vehicle").
+- **Phase 3:** Printable Midas-Style Estimate & Coupon Voucher Generator,
+  Seasonal Tire & Rim Size Calculator, LocalBusiness JSON-LD SEO Schema for
+  Brampton, and Shop Owner Rate/Promo Config Drawer.
+
+## Phase 1 Granular 3-Segment Blueprint Requirements
+
+### Segment 1 (`revolutions_engine.js` + `test_revolutions.js`)
+
+Dual UMD module (`window.RevolutionsEngine` for browser, `module.exports`
+for Node). Exact exported constants and pure functions:
+
+1. `SHOP_INFO` — name, address, city, province, postalCode, phone, hours,
+   specialties, `hstRate: 0.13`.
+2. `SERVICE_CATALOG` — 12 core services across 6 categories: Brakes,
+   Tires & Alignment, Computer Diagnostics, Oil & Tune-Up, Air Conditioning,
+   Suspension/Exhaust/Safety Certificate.
+3. `COUPON_CATALOG` — Midas-style promos: e.g., `SYNTH15` $15 Off Full
+   Synthetic Oil Change, `ALIGN25` $25 Off 4-Wheel Alignment with Tire
+   Service, `DIAG50` 50% Off Computer Diagnostic with Repair, `BRAKE50`
+   $50 Off Complete Front or Rear Brake Job, `SAFETY10` $10 Off Ontario
+   Safety Standards Certificate.
+4. `calculateEstimate(options)` — computes base parts, base labor, vehicle
+   origin/class multipliers (`domestic`, `asian_import`, `euro_import` plus
+   `sedan`, `suv`, `truck`), multi-service shared-hoist labor discount
+   (10% off labor when 2+ services selected, 15% off labor when 3+
+   services selected), shop supplies fee (5% of labor, capped at $35 CAD),
+   coupon validation/discount, subtotal, 13% Ontario HST, and final total
+   low/high range.
+5. `validateBooking(bookingPayload)` — validates customer name, phone,
+   vehicle year/make/model/origin, selected service IDs, appointment
+   date/time against Brampton shop hours (Mon-Fri 8:00 AM - 6:00 PM,
+   Sat 8:30 AM - 3:00 PM, Closed Sunday), and drop-off vs. wait-in-lounge
+   mode.
+6. `recommendServicesBySymptoms(symptomsArray)` — maps customer symptoms
+   (e.g., `squealing_brakes`, `pulling_steering`, `check_engine_light`,
+   `warm_ac`, `clunking_bumps`, `loud_exhaust`, `buying_used_car`) to
+   prioritized Revolutions Automotive services and diagnostic packages.
+
+`test_revolutions.js`: 35+ headless Node `assert` unit tests covering every
+function, vehicle multiplier, combo discount math, 13% HST calculation,
+shop supplies cap, coupon eligibility edge cases, and Sunday/after-hours
+booking rejection.
+
+### Segment 2 (`index.html`, `styles.css`, and 3 Custom AI Assets)
+
+- 3 custom `.jpg` images generated via `python ..\generate_image.py`:
+  - `assets\hero_bay.jpg` — state-of-the-art diagnostic and alignment
+    service bay with clean hoists and a sports/import sedan.
+  - `assets\diagnostics_tech.jpg` — close-up of an advanced automotive
+    computer diagnostic scanner connected to a modern engine bay.
+  - `assets\safety_badge.jpg` — high-contrast metallic gold and crimson
+    Ontario Certified Auto Repair & Safety Standards emblem.
+- Explicit list of every mandatory DOM ID in `index.html`, including
+  `#shop-phone-header`, `#vehicle-origin-select`, `#vehicle-class-select`,
+  `#vehicle-year-input`, `#vehicle-make-input`, `#vehicle-model-input`,
+  `#service-grid`, `#symptom-chips`, `#coupon-select`,
+  `#estimate-summary-card`, `#est-subtotal`, `#est-discount`, `#est-hst`,
+  `#est-total-range`, `#booking-form`, `#booking-date`, `#booking-time`,
+  `#booking-mode`, `#booking-feedback`, and `#btn-load-sample` for 1-click
+  sample customer data.
+- Asset magic-byte (`FF D8 FF`) and DOM ID presence checks added to
+  `test_revolutions.js`.
+
+### Segment 3 (`app.js` + Integration & Anti-Drift Tests in `test_revolutions.js`)
+
+- Full interactive controller wiring vehicle selector, service cards,
+  symptom recommender chips, Midas-style coupon wallet, live CAD + 13% HST
+  estimate drawer, appointment booking with `localStorage` persistence
+  (`revolutions_automotive_state_v1`), and `#btn-load-sample`.
+- Anti-drift test in `test_revolutions.js` verifying every DOM ID queried in
+  `app.js` exists in `index.html`.
+
+## Deliverable Structure of Your Response
+
+1. `# Revolutions Automotive — Master Roadmap`
+2. Phase 1 / Phase 2 / Phase 3 overviews with 3 segments each, every
+   segment listing its 1-3 code files and its headless gate command.
+3. The granular Phase 1 blueprint covering Segments 1-3 exactly as
+   specified above, including the full mandatory DOM ID list and the
+   exact exported engine API contract.
+4. Verification gates and acceptance criteria per segment.
