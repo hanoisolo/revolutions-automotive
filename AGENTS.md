@@ -16,6 +16,8 @@
 ```
 .gitignore
 AGENTS.md
+revolutions_engine.js
+test_revolutions.js
 plans/
   prompt_stage2.txt
   MASTER_ROADMAP.md
@@ -39,6 +41,6 @@ any command.
 
 ## Current Status
 
-Stage 1 & Stage 2 complete (Master Roadmap generated at
-`plans\MASTER_ROADMAP.md`, mirrored to `plans\ROADMAP.md`).
-**Phase 1 pending** — no application code written yet.
+Stage 1 & Stage 2 complete. **Phase 1 — Segment 1 complete**
+(`revolutions_engine.js` + `test_revolutions.js`, gate green 68/68).
+**Phase 1 — Segment 2 pending** (index.html, styles.css, AI assets).
