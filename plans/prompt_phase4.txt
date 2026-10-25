@@ -1,0 +1,84 @@
+PHASE 4 - USER-REQUESTED ENHANCEMENTS (verbatim spec)
+
+Read AGENTS.md, revolutions_engine.js, index.html, styles.css, app.js, and
+test_revolutions.js. Implement the following 5 user-requested enhancements
+across the Revolutions Automotive platform without breaking or weakening any
+of the existing 207 unit tests:
+
+Follow these strict rules:
+- NEVER use bash redirects (> or 2>) or shell variables ($?, $VAR) in any shell
+  command.
+- Never weaken, delete, or loosen any of the existing 207 test assertions in
+  `test_revolutions.js`—only append new additive tests.
+
+### 1. Symptoms & Services "Clear All" Controls
+- In `index.html` (and `app.js`):
+  - Add `#btn-clear-symptoms` inside or next to `#symptom-chips`. Clicking it
+    deselects all active symptom chips, clears `#symptom-recommendations`, and
+    resets symptom state.
+  - Add `#btn-clear-services` next to `#category-filter-bar`. Clicking it
+    unchecks all selected services, updates state, and resets the live
+    estimate card to $0.00.
+
+### 2. Multi-Sensory Feedback on "Add Recommended Services"
+- In `app.js` & `styles.css`:
+  - When `#btn-wizard-add-service` or symptom "Add Recommended" button is
+    clicked:
+    1. Play a subtle, pleasant 2-tone synthetic audio chime using native Web
+       Audio API (AudioContext oscillator: 587Hz -> 880Hz, ~150ms).
+    2. Display a slide-in toast notification element `#toast-notification` with
+       message: "✓ Added [N] Recommended Service(s) to Estimate!".
+    3. Trigger a temporary pulse/glow animation class (`.est-highlight-pulse`)
+       on `#estimate-summary-card`.
+
+### 3. Repair Bay Tracker Clear / Reset Control
+- Add `#btn-track-clear` ("Clear / Reset Search") next to `#btn-track-vehicle`.
+- In `app.js`, clicking `#btn-track-clear` clears `#tracker-input-code` and
+  `#tracker-input-phone`, clears `#tracker-technician-notes`, resets all 6
+  timeline breadcrumbs to neutral pending state, and clears `#tracker-feedback`.
+
+### 4. Create Dedicated `track.html` & Streamline Homepage
+- Create `track.html` as a dedicated "Live Repair Bay Tracker" page sharing
+  `styles.css`, `revolutions_engine.js`, and `app.js`.
+  - Include header navigation back to Home (`index.html`), shop hours, and
+    direct call button.
+  - Include `#tracker-input-code`, `#tracker-input-phone`,
+    `#btn-track-vehicle`, `#btn-track-clear`, `#btn-track-sample-1`,
+    `#btn-track-sample-2`, `#tracker-status-timeline`,
+    `#tracker-technician-notes`, and `#tracker-feedback`.
+  - Support URL query parameter parsing on load (e.g. `track.html?code=REV-2048`
+    automatically runs lookup and populates tracker).
+- On `index.html`: Replace the large bay tracker section with a prominent,
+  high-converting banner card linking directly to `track.html` ("Track Your
+  Vehicle's Live Bay Status on Fisherman Dr →"). Maintain required anchor
+  tags/IDs or redirect links so no navigation breaks.
+
+### 5. Create Dedicated `safety.html` & Streamline Homepage
+- Create `safety.html` as a dedicated "Ontario Safety Standards Certificate
+  (MTO SSC) Inspection Hub" sharing `styles.css`, `revolutions_engine.js`,
+  and `app.js`.
+  - Include the 11-point MTO checklist `#safety-checklist-container`, visual
+    score gauge `#safety-score-gauge`, summary alert `#safety-summary-alert`,
+    and action buttons:
+    - `#btn-safety-book-inspection`: Books inspection (links to
+      `index.html#booking-form` with `mto_safety_exhaust` pre-selected).
+    - `#btn-safety-reset`: Clears all checklist selections back to neutral.
+    - `#btn-safety-cancel`: Returns to `index.html`.
+- On `index.html`: Replace the heavy checklist with a high-converting Ontario
+  Safety inspection feature showcase featuring `assets/safety_badge.jpg` and a
+  CTA button "Launch Interactive MTO Pre-Check →" linking to `safety.html`.
+
+### 6. Append Tests & Verify
+- Append new additive tests to `test_revolutions.js`:
+  - Assert existence and HTML validity of `track.html` and `safety.html`.
+  - Assert existence of `#btn-clear-symptoms`, `#btn-clear-services`,
+    `#btn-track-clear`, `#toast-notification`, and URL parameter handling in
+    `track.html`.
+  - Run anti-drift regex check across all pages (`index.html`, `track.html`,
+    `safety.html`).
+- Execute `node test_revolutions.js` and verify that ALL 207 prior tests pass
+  AND all new tests pass (220+ total green).
+- Once green, update `AGENTS.md`, run Section 4 secret scan, and commit
+  cleanly to git:
+  `git commit -m "feat: extract MTO safety and bay tracker to dedicated pages, add clear buttons and audio toast feedback"`
+- Report the test gate summary and commit hash when finished.

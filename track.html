@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Repair Bay Tracker | Revolutions Automotive, Brampton ON</title>
+  <meta name="description" content="Track your vehicle's live repair bay status at Revolutions Automotive, 1-15A Fisherman Dr, Brampton, ON. Enter your work order code to follow all six shop stages in real time. Call (905) 846-8351.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div id="announcement-banner" class="announcement-banner" role="region" aria-label="Shop announcement">
+    <span class="banner-flag">Shop Notice</span>
+    <span id="announcement-banner-text">Brampton Drivers: Book Winter Tire Changeovers &amp; MTO Safety Inspections Early!</span>
+  </div>
+
+  <header class="site-header">
+    <div class="utility-bar">
+      <span id="shop-address-header" class="utility-item">1-15A Fisherman Dr, Brampton, ON L7A 1B7</span>
+      <span id="shop-hours-badge" class="utility-item utility-hours">Mon&ndash;Fri 8 AM&ndash;6 PM &middot; Sat 8:30 AM&ndash;3 PM &middot; Sun Closed</span>
+      <a id="shop-phone-header" class="utility-item utility-phone" href="tel:+19058468351">(905) 846-8351</a>
+    </div>
+    <div class="masthead">
+      <div class="brand-block">
+        <div class="brand-mark">RA</div>
+        <div class="brand-text">
+          <h1 class="brand-name">Revolutions Automotive</h1>
+          <p class="brand-tagline">Live Repair Bay Tracker &mdash; Fisherman Dr, Brampton</p>
+        </div>
+      </div>
+      <nav class="quick-nav" aria-label="Tracker page navigation">
+        <a href="index.html">&larr; Back to Home</a>
+        <a href="index.html#booking-section">Book a Bay</a>
+        <a href="safety.html">MTO Safety Pre-Check</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section class="section" id="bay-tracker-section">
+      <header class="section-head">
+        <h2>Track My Vehicle &mdash; Live Repair Bay Status</h2>
+        <p>Follow your repair across our six shop stages, from check-in on Fisherman Dr to the quality road test and pickup. Enter your work order code together with your phone or plate to verify, or load a live sample order. Tip: open <strong>track.html?code=REV-2048</strong> to jump straight to an order.</p>
+      </header>
+      <div class="tracker-panel">
+        <div class="tracker-form">
+          <div class="tracker-field">
+            <label for="tracker-input-code">Work Order Code</label>
+            <input id="tracker-input-code" type="text" placeholder="REV-2048" autocomplete="off">
+          </div>
+          <div class="tracker-field">
+            <label for="tracker-input-phone">Phone or Plate</label>
+            <input id="tracker-input-phone" type="text" placeholder="Phone or Plate" autocomplete="off">
+          </div>
+          <button id="btn-track-vehicle" type="button" class="btn btn-primary btn-track">Track My Vehicle</button>
+          <button id="btn-track-clear" type="button" class="btn btn-sample-alt btn-track-clear">Clear / Reset Search</button>
+        </div>
+        <div class="tracker-samples">
+          <button id="btn-track-sample-1" type="button" class="btn btn-sample-alt">Load REV-2048: In Bay</button>
+          <button id="btn-track-sample-2" type="button" class="btn btn-sample-alt">Load REV-3105: Parts Ordered</button>
+        </div>
+        <div id="tracker-feedback" class="tracker-feedback" aria-live="polite"></div>
+        <ol id="tracker-status-timeline" class="tracker-status-timeline" aria-label="Repair progress stages">
+          <li class="tl-step">Checked In</li>
+          <li class="tl-step">Inspection &amp; Diagnostics</li>
+          <li class="tl-step">Parts Ordered</li>
+          <li class="tl-step">In Bay / Repairing</li>
+          <li class="tl-step">Quality &amp; Alignment</li>
+          <li class="tl-step">Ready for Pickup</li>
+        </ol>
+        <div id="tracker-technician-notes" class="tracker-technician-notes" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="section" id="tracker-shop-info">
+      <header class="section-head">
+        <h2>Shop Hours &amp; Direct Line</h2>
+        <p>Our service advisors answer live bay questions during shop hours.</p>
+      </header>
+      <div class="tracker-shop-card">
+        <ul>
+          <li>Mon&ndash;Fri: 8:00 AM &ndash; 6:00 PM</li>
+          <li>Saturday: 8:30 AM &ndash; 3:00 PM</li>
+          <li>Sunday: Closed</li>
+        </ul>
+        <a class="btn btn-primary" href="tel:+19058468351">Call (905) 846-8351</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div>
+        <h4>Revolutions Automotive</h4>
+        <p>1-15A Fisherman Dr, Brampton, ON L7A 1B7</p>
+        <p><a href="tel:+19058468351">(905) 846-8351</a></p>
+      </div>
+      <div>
+        <h4>Hours</h4>
+        <p>Mon&ndash;Fri: 8:00 AM &ndash; 6:00 PM</p>
+        <p>Saturday: 8:30 AM &ndash; 3:00 PM</p>
+        <p>Sunday: Closed</p>
+      </div>
+    </div>
+    <p class="footer-legal">Work order stages update live from our Brampton shop floor. Estimates in CAD plus 13% Ontario HST.</p>
+  </footer>
+
+  <script src="revolutions_engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

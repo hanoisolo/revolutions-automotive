@@ -2328,6 +2328,217 @@ test('the CSV export gathers confirmed bookings, live work orders and seed order
     'export must include user-created work orders');
 });
 
+/* ================================================================== */
+/* Phase 4: Page extraction, clear controls & multi-sensory feedback  */
+/* ================================================================== */
+
+group('Phase 4 - Page Extraction & Feedback');
+
+var TRACK_HTML = fs.readFileSync('track.html', 'utf8');
+var SAFETY_HTML = fs.readFileSync('safety.html', 'utf8');
+
+test('track.html exists and is a valid standalone HTML document', function () {
+  assert.ok(TRACK_HTML.length > 500, 'track.html is only ' + TRACK_HTML.length + ' chars');
+  assert.ok(TRACK_HTML.indexOf('<!DOCTYPE html>') !== -1, 'track.html must declare doctype');
+  assert.ok(TRACK_HTML.indexOf('Revolutions Automotive') !== -1, 'track.html must carry the brand');
+});
+
+test('track.html links styles.css and loads the engine before app.js', function () {
+  assert.ok(TRACK_HTML.indexOf('styles.css') !== -1, 'track.html must reference styles.css');
+  var engineAt = TRACK_HTML.indexOf('<script src="revolutions_engine.js"></script>');
+  var appAt = TRACK_HTML.indexOf('<script src="app.js"></script>');
+  var bodyAt = TRACK_HTML.indexOf('</body>');
+  assert.ok(engineAt !== -1, 'track.html must link the engine');
+  assert.ok(appAt !== -1, 'track.html must link app.js');
+  assert.ok(engineAt < appAt && appAt < bodyAt, 'engine must load before app.js before </body>');
+});
+
+test('track.html carries the full bay tracker ID contract including the clear control', function () {
+  [
+    'tracker-input-code', 'tracker-input-phone', 'btn-track-vehicle',
+    'btn-track-clear', 'btn-track-sample-1', 'btn-track-sample-2',
+    'tracker-status-timeline', 'tracker-technician-notes', 'tracker-feedback'
+  ].forEach(function (id) {
+    assert.ok(TRACK_HTML.indexOf('id="' + id + '"') !== -1,
+      'track.html must define #' + id + ' verbatim');
+  });
+});
+
+test('track.html ships the 6-stage timeline, home nav, shop hours and direct call button', function () {
+  var timelineStart = TRACK_HTML.indexOf('id="tracker-status-timeline"');
+  var timelineEnd = TRACK_HTML.indexOf('</ol>', timelineStart);
+  assert.ok(timelineStart !== -1 && timelineEnd !== -1, 'timeline list required');
+  var timelineHtml = TRACK_HTML.slice(timelineStart, timelineEnd);
+  ['Checked In', 'Inspection &amp; Diagnostics', 'Parts Ordered',
+    'In Bay / Repairing', 'Quality &amp; Alignment', 'Ready for Pickup'].forEach(function (label) {
+    assert.ok(timelineHtml.indexOf(label) !== -1, 'timeline stage missing: ' + label);
+  });
+  assert.strictEqual((timelineHtml.match(/<li class="tl-step">/g) || []).length, 6,
+    'track.html must render exactly 6 stage steps');
+  assert.ok(TRACK_HTML.indexOf('href="index.html"') !== -1, 'header nav must link back to Home');
+  assert.ok(TRACK_HTML.indexOf('href="tel:+19058468351"') !== -1, 'direct call button required');
+  assert.ok(TRACK_HTML.indexOf('Mon&ndash;Fri: 8:00 AM &ndash; 6:00 PM') !== -1,
+    'shop hours must be listed');
+  assert.ok(TRACK_HTML.indexOf('track.html?code=REV-2048') !== -1,
+    'the URL parameter deep-link pattern must be documented');
+});
+
+test('safety.html exists and is a valid standalone HTML document', function () {
+  assert.ok(SAFETY_HTML.length > 500, 'safety.html is only ' + SAFETY_HTML.length + ' chars');
+  assert.ok(SAFETY_HTML.indexOf('<!DOCTYPE html>') !== -1, 'safety.html must declare doctype');
+  assert.ok(SAFETY_HTML.indexOf('Revolutions Automotive') !== -1, 'safety.html must carry the brand');
+});
+
+test('safety.html links styles.css and loads the engine before app.js', function () {
+  assert.ok(SAFETY_HTML.indexOf('styles.css') !== -1, 'safety.html must reference styles.css');
+  var engineAt = SAFETY_HTML.indexOf('<script src="revolutions_engine.js"></script>');
+  var appAt = SAFETY_HTML.indexOf('<script src="app.js"></script>');
+  var bodyAt = SAFETY_HTML.indexOf('</body>');
+  assert.ok(engineAt !== -1 && appAt !== -1, 'engine and controller scripts required');
+  assert.ok(engineAt < appAt && appAt < bodyAt, 'engine must load before app.js before </body>');
+});
+
+test('safety.html carries the MTO checklist, gauge, alert and all three action buttons', function () {
+  [
+    'safety-checklist-container', 'safety-score-gauge', 'safety-summary-alert',
+    'btn-safety-book-inspection', 'btn-safety-reset', 'btn-safety-cancel'
+  ].forEach(function (id) {
+    assert.ok(SAFETY_HTML.indexOf('id="' + id + '"') !== -1,
+      'safety.html must define #' + id + ' verbatim');
+  });
+  assert.ok(SAFETY_HTML.indexOf('href="index.html"') !== -1, 'must link back to Home');
+  assert.ok(SAFETY_HTML.indexOf('assets/safety_badge.jpg') !== -1,
+    'the safety badge asset must be featured');
+  assert.ok(SAFETY_HTML.indexOf('Book Official MTO Safety Inspection') !== -1,
+    'the book CTA label must match the index contract');
+});
+
+test('index.html defines the Phase 4 clear controls and the toast element', function () {
+  ['btn-clear-symptoms', 'btn-clear-services', 'btn-track-clear', 'toast-notification']
+    .forEach(function (id) {
+      assert.ok(INDEX_HTML.indexOf('id="' + id + '"') !== -1,
+        'index.html must define #' + id + ' verbatim');
+    });
+  assert.ok(INDEX_HTML.indexOf('Clear All Symptoms') !== -1,
+    'the symptom clear button must be labelled');
+  assert.ok(INDEX_HTML.indexOf('Clear Selected Services') !== -1,
+    'the services clear button must be labelled');
+});
+
+test('index.html links the dedicated pages and retains hidden legacy panels', function () {
+  assert.ok(INDEX_HTML.indexOf('href="track.html"') !== -1, 'tracker banner must link track.html');
+  assert.ok(INDEX_HTML.indexOf('href="safety.html"') !== -1, 'safety CTA must link safety.html');
+  assert.ok(INDEX_HTML.indexOf('Live Bay Status on Fisherman Dr') !== -1,
+    'the tracker banner must carry the Fisherman Dr CTA copy');
+  assert.ok(INDEX_HTML.indexOf('Launch Interactive MTO Pre-Check') !== -1,
+    'the safety showcase must carry the MTO Pre-Check CTA copy');
+  assert.ok(INDEX_HTML.indexOf('class="tracker-panel" hidden') !== -1,
+    'the legacy tracker panel must stay hidden but present');
+  assert.ok(INDEX_HTML.indexOf('class="safety-layout" hidden') !== -1,
+    'the legacy safety layout must stay hidden but present');
+});
+
+test('app.js wires the clear controls, safety reset/cancel and page-aware guards', function () {
+  ['btn-clear-symptoms', 'btn-clear-services', 'btn-track-clear',
+    'btn-safety-reset', 'btn-safety-cancel', 'toast-notification'
+  ].forEach(function (id) {
+    assert.ok(APP_JS.indexOf(id) !== -1, 'app.js must wire #' + id);
+  });
+  ['clearAllSymptoms', 'clearSelectedServices', 'clearTrackerPanel',
+    'resetSafetyChecklist', 'trackFromUrl'
+  ].forEach(function (fn) {
+    assert.ok(APP_JS.indexOf(fn) !== -1, 'app.js must implement ' + fn);
+  });
+  assert.ok(APP_JS.indexOf("getElementById('service-grid')") !== -1,
+    'page-aware guards must probe for the service grid');
+  assert.ok(APP_JS.indexOf("getElementById('booking-feedback')") !== -1,
+    'page-aware guards must probe for the booking feedback box');
+});
+
+test('app.js plays the 587-880 Hz Web Audio chime and toasts the add-service feedback', function () {
+  ['AudioContext', '587', '880', 'playAddServiceChime', 'notifyAddedServices',
+    'est-highlight-pulse', 'Recommended Service', 'to Estimate!'
+  ].forEach(function (token) {
+    assert.ok(APP_JS.indexOf(token) !== -1, 'add-service feedback must include: ' + token);
+  });
+  assert.ok(APP_JS.indexOf('toast.classList') !== -1,
+    'the toast visibility class must be toggled');
+});
+
+test('app.js supports track.html URL parameters and cross-page safety booking', function () {
+  assert.ok(APP_JS.indexOf('URLSearchParams') !== -1,
+    'URL query parsing must use URLSearchParams');
+  assert.ok(APP_JS.indexOf('track.html?code=') !== -1,
+    'the booking-to-tracker bridge must deep-link track.html with the code');
+  assert.ok(APP_JS.indexOf('index.html#booking-form') !== -1,
+    'the safety book CTA must redirect to the homepage booking form');
+  assert.ok(APP_JS.indexOf('mto_safety_exhaust') !== -1,
+    'the safety book CTA must pre-select the MTO inspection service');
+});
+
+test('styles.css ships the toast, estimate pulse and dedicated-page banner styles', function () {
+  ['.toast-notification', '.toast-notification.is-visible', '.est-highlight-pulse',
+    '@keyframes estimate-pulse', '.tracker-banner-card', '.safety-banner-card',
+    '.safety-actions', '.tracker-shop-card'
+  ].forEach(function (selector) {
+    assert.ok(STYLES_CSS.indexOf(selector) !== -1, 'styles.css missing: ' + selector);
+  });
+  assert.ok(STYLES_CSS.indexOf('[hidden] { display: none !important; }') !== -1,
+    'the hidden attribute must override author display rules');
+});
+
+test('anti-drift: every DOM ID referenced in app.js exists in at least one page', function () {
+  var pages = [INDEX_HTML, TRACK_HTML, SAFETY_HTML];
+  var ids = [];
+  var reGetById = /getElementById\(\s*['"]([^'"]+)['"]\s*\)/g;
+  var reQueryId = /querySelector(?:All)?\(\s*['"]#([A-Za-z0-9_-]+)['"]\s*\)/g;
+  var match;
+  while ((match = reGetById.exec(APP_JS)) !== null) ids.push(match[1]);
+  while ((match = reQueryId.exec(APP_JS)) !== null) ids.push(match[1]);
+  assert.ok(ids.length >= 60, 'expected at least 60 DOM references in app.js, found ' + ids.length);
+  ids.forEach(function (id) {
+    var found = pages.some(function (html) {
+      return html.indexOf('id="' + id + '"') !== -1;
+    });
+    assert.ok(found, 'app.js references DOM ID missing from all pages: #' + id);
+  });
+});
+
+test('anti-drift: every tracker-page ID in app.js exists verbatim in track.html', function () {
+  var trackerIds = [
+    'tracker-input-code', 'tracker-input-phone', 'btn-track-vehicle',
+    'btn-track-clear', 'btn-track-sample-1', 'btn-track-sample-2',
+    'tracker-status-timeline', 'tracker-technician-notes', 'tracker-feedback'
+  ];
+  trackerIds.forEach(function (id) {
+    assert.ok(TRACK_HTML.indexOf('id="' + id + '"') !== -1,
+      'track.html is missing tracker ID: #' + id);
+  });
+});
+
+test('anti-drift: every safety-page ID in app.js exists verbatim in safety.html', function () {
+  var safetyIds = [
+    'safety-checklist-container', 'safety-score-gauge', 'safety-summary-alert',
+    'btn-safety-book-inspection', 'btn-safety-reset', 'btn-safety-cancel'
+  ];
+  safetyIds.forEach(function (id) {
+    assert.ok(SAFETY_HTML.indexOf('id="' + id + '"') !== -1,
+      'safety.html is missing safety ID: #' + id);
+  });
+});
+
+test('simulation: clearing state resets the engine estimate to a zeroed card', function () {
+  var cleared = Engine.calculateEstimate({ serviceIds: [], origin: 'asian_import', vehicleClass: 'suv' });
+  assert.strictEqual(cleared.serviceCount, 0);
+  assert.strictEqual(cleared.partsLow, 0);
+  assert.strictEqual(cleared.laborLow, 0);
+  assert.strictEqual(cleared.subtotalLow, 0);
+  assert.strictEqual(cleared.hstLow, 0);
+  assert.strictEqual(cleared.totalLow, 0);
+  assert.strictEqual(cleared.totalHigh, 0);
+  assert.ok(cleared.comboDiscountRate === 0, 'no combo discount with an empty selection');
+});
+
 /* ------------------------------------------------------------------ */
 /* report                                                              */
 /* ------------------------------------------------------------------ */

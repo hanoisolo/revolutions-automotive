@@ -208,15 +208,99 @@
   }
 
   function addServices(serviceIds) {
+    var newlyAdded = 0;
     serviceIds.forEach(function (id) {
       if (state.selectedServiceIds.indexOf(id) === -1) {
         state.selectedServiceIds.push(id);
+        newlyAdded++;
       }
     });
     saveState();
-    renderServiceGrid();
-    recalculateAndRenderEstimate();
+    if (document.getElementById('service-grid')) renderServiceGrid();
+    if (document.getElementById('estimate-summary-card')) recalculateAndRenderEstimate();
     runLiveBookingValidation(false);
+    if (newlyAdded > 0) notifyAddedServices(newlyAdded);
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Phase 4: Multi-sensory add-service feedback                     */
+  /* -------------------------------------------------------------- */
+
+  /* Subtle two-tone synthetic chime (587 Hz -> 880 Hz, ~150 ms) using the
+     native Web Audio API. Silent no-op when the API is unavailable. */
+  function playAddServiceChime() {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (typeof AudioCtx !== 'function') return false;
+      var audioCtx = new AudioCtx();
+      var oscillator = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      var now = audioCtx.currentTime;
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(587, now);
+      oscillator.frequency.setValueAtTime(880, now + 0.075);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+      oscillator.connect(gain);
+      gain.connect(audioCtx.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.16);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function notifyAddedServices(count) {
+    playAddServiceChime();
+    var toast = document.getElementById('toast-notification');
+    if (toast) {
+      toast.textContent = '\u2713 Added ' + count + ' Recommended Service' +
+        (count === 1 ? '' : 's') + ' to Estimate!';
+      toast.classList.remove('is-visible');
+      void toast.offsetWidth;
+      toast.classList.add('is-visible');
+      window.setTimeout(function () {
+        toast.classList.remove('is-visible');
+      }, 3200);
+    }
+    var estimateCard = document.getElementById('estimate-summary-card');
+    if (estimateCard) {
+      estimateCard.classList.add('est-highlight-pulse');
+      window.setTimeout(function () {
+        estimateCard.classList.remove('est-highlight-pulse');
+      }, 900);
+    }
+  }
+
+  /* -------------------------------------------------------------- */
+  /* Phase 4: Clear All controls                                     */
+  /* -------------------------------------------------------------- */
+
+  function clearAllSymptoms() {
+    state.activeSymptoms = [];
+    saveState();
+    renderSymptomChips();
+    renderSymptomRecommendations();
+  }
+
+  function clearSelectedServices() {
+    state.selectedServiceIds = [];
+    saveState();
+    if (document.getElementById('service-grid')) renderServiceGrid();
+    if (document.getElementById('estimate-summary-card')) recalculateAndRenderEstimate();
+    runLiveBookingValidation(false);
+  }
+
+  function bindClearControls() {
+    var clearSymptomsBtn = document.getElementById('btn-clear-symptoms');
+    if (clearSymptomsBtn) {
+      clearSymptomsBtn.addEventListener('click', clearAllSymptoms);
+    }
+    var clearServicesBtn = document.getElementById('btn-clear-services');
+    if (clearServicesBtn) {
+      clearServicesBtn.addEventListener('click', clearSelectedServices);
+    }
   }
 
   /* -------------------------------------------------------------- */
@@ -492,6 +576,7 @@
 
   function runLiveBookingValidation(isSubmit) {
     var box = document.getElementById('booking-feedback');
+    if (!box) return;
     if (!isSubmit && !bookingStarted()) {
       box.innerHTML = '';
       return;
@@ -829,13 +914,35 @@
     }
   }
 
+  function resetSafetyChecklist() {
+    state.safetyAnswers = {};
+    saveState();
+    if (!document.getElementById('safety-checklist-container')) return;
+    renderSafetyChecklist();
+    renderSafetyVerdict();
+  }
+
   function bindSafetyPreCheck() {
     document.getElementById('btn-safety-book-inspection').addEventListener('click', function () {
       var evaluation = Engine.evaluateSafetyPreCheck(state.safetyAnswers);
       addServices(['mto_safety_exhaust'].concat(evaluation.recommendedServiceIds));
-      document.getElementById('booking-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.getElementById('cust-name').focus();
+      if (document.getElementById('booking-form')) {
+        document.getElementById('booking-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('cust-name').focus();
+      } else {
+        window.location.href = 'index.html#booking-form';
+      }
     });
+    var resetBtn = document.getElementById('btn-safety-reset');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', resetSafetyChecklist);
+    }
+    var cancelBtn = document.getElementById('btn-safety-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        window.location.href = 'index.html';
+      });
+    }
     renderSafetyChecklist();
     renderSafetyVerdict();
   }
@@ -944,6 +1051,34 @@
     return workOrder;
   }
 
+  function clearTrackerPanel() {
+    var codeInput = document.getElementById('tracker-input-code');
+    if (codeInput) codeInput.value = '';
+    var phoneInput = document.getElementById('tracker-input-phone');
+    if (phoneInput) phoneInput.value = '';
+    var notes = document.getElementById('tracker-technician-notes');
+    if (notes) notes.innerHTML = '';
+    renderTimeline(null);
+    var feedback = document.getElementById('tracker-feedback');
+    if (feedback) feedback.innerHTML = '';
+  }
+
+  /* Phase 4: URL query parameter support on track.html
+     (e.g. track.html?code=REV-2048 auto-runs the lookup). */
+  function trackFromUrl() {
+    if (typeof window.URLSearchParams !== 'function') return false;
+    var params = new window.URLSearchParams(window.location.search);
+    var code = params.get('code');
+    if (!code) return false;
+    var phone = params.get('phone') || '';
+    var codeInput = document.getElementById('tracker-input-code');
+    if (codeInput) codeInput.value = code;
+    var phoneInput = document.getElementById('tracker-input-phone');
+    if (phoneInput) phoneInput.value = phone;
+    trackVehicle(code, phone);
+    return true;
+  }
+
   function bindBayTracker() {
     document.getElementById('btn-track-vehicle').addEventListener('click', function () {
       trackVehicle(
@@ -951,6 +1086,10 @@
         document.getElementById('tracker-input-phone').value
       );
     });
+    var trackClearBtn = document.getElementById('btn-track-clear');
+    if (trackClearBtn) {
+      trackClearBtn.addEventListener('click', clearTrackerPanel);
+    }
     document.getElementById('btn-track-sample-1').addEventListener('click', function () {
       document.getElementById('tracker-input-code').value = 'REV-2048';
       document.getElementById('tracker-input-phone').value = '';
@@ -961,7 +1100,9 @@
       document.getElementById('tracker-input-phone').value = '';
       trackVehicle('REV-3105', '');
     });
-    trackVehicle(state.activeTrackedCode || 'REV-2048', '');
+    if (!trackFromUrl()) {
+      trackVehicle(state.activeTrackedCode || 'REV-2048', '');
+    }
   }
 
   /* -------------------------------------------------------------- */
@@ -984,10 +1125,7 @@
     trackBtn.className = 'btn btn-primary';
     trackBtn.textContent = 'Track My Vehicle Now';
     trackBtn.addEventListener('click', function () {
-      document.getElementById('tracker-input-code').value = workOrder.code;
-      document.getElementById('tracker-input-phone').value = '';
-      trackVehicle(workOrder.code, '');
-      document.getElementById('bay-tracker-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.location.href = 'track.html?code=' + encodeURIComponent(workOrder.code);
     });
     panel.appendChild(trackBtn);
 
@@ -1069,9 +1207,11 @@
   }
 
   function renderAnnouncementBanner() {
+    var slot = document.getElementById('announcement-banner-text');
+    if (!slot) return;
     var text = (state.ownerConfig && state.ownerConfig.bannerText) ||
       Engine.TIER_CONFIG_DEFAULTS.bannerText;
-    document.getElementById('announcement-banner-text').textContent = text;
+    slot.textContent = text;
   }
 
   /* --- Seasonal tire & rim size calculator ------------------------- */
@@ -1348,22 +1488,31 @@
     recalculateAndRenderEstimate();
   }
 
+  /* Page-aware init: app.js is shared by index.html, track.html and
+     safety.html - each module only binds when its anchor element exists on
+     the current page. */
   function init() {
     if (!window.RevolutionsEngine) return;
     loadState();
-    bindVehicleInputs();
-    bindCouponSelect();
-    bindBookingInputs();
-    bindLoadSample();
-    bindWizard();
-    bindSafetyPreCheck();
-    bindBayTracker();
-    bindTireCalculator();
-    bindVoucherModal();
-    bindOwnerDrawer();
-    syncVehicleAndCouponInputs();
-    syncBookingInputs();
-    renderAll();
+    if (document.getElementById('vehicle-origin-select')) {
+      bindVehicleInputs();
+      syncVehicleAndCouponInputs();
+    }
+    if (document.getElementById('coupon-select')) bindCouponSelect();
+    if (document.getElementById('booking-form')) {
+      bindBookingInputs();
+      syncBookingInputs();
+    }
+    if (document.getElementById('btn-load-sample')) bindLoadSample();
+    bindClearControls();
+    if (document.getElementById('wizard-container')) bindWizard();
+    if (document.getElementById('safety-checklist-container')) bindSafetyPreCheck();
+    if (document.getElementById('btn-track-vehicle')) bindBayTracker();
+    if (document.getElementById('tire-calc-section')) bindTireCalculator();
+    if (document.getElementById('voucher-modal')) bindVoucherModal();
+    if (document.getElementById('owner-drawer-toggle')) bindOwnerDrawer();
+    renderAnnouncementBanner();
+    if (document.getElementById('estimate-summary-card')) renderAll();
     runLiveBookingValidation(false);
   }
 

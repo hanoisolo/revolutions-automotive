@@ -1355,6 +1355,163 @@ input:focus, select:focus, button:focus-visible {
 
 .owner-status-feedback:empty { display: none; }
 
+/* Phase 4: Clear All controls, toast & estimate pulse ----------------- */
+
+.chip-row-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.chip-row-wrap .chip-row { flex: 1 1 auto; }
+
+.btn-clear-chips,
+.btn-clear-services { flex: 0 0 auto; }
+
+.filter-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filter-bar-row .filter-bar { flex: 1 1 auto; }
+
+.btn-track-clear { align-self: center; }
+
+/* The hidden attribute must win over author display rules (.safety-layout
+   and similar grid/flex panels) so legacy panels stay collapsed. */
+[hidden] { display: none !important; }
+
+/* Phase 4: high-converting dedicated-page banner cards --------------- */
+
+.tracker-banner-card,
+.safety-banner-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.75rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.tracker-banner-card:hover,
+.safety-banner-card:hover {
+  text-decoration: none;
+  transform: translateY(-2px);
+  border-top-color: var(--gold-bright);
+}
+
+.tracker-banner-kicker,
+.safety-banner-kicker {
+  color: var(--gold-bright);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.tracker-banner-title,
+.safety-banner-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.tracker-banner-sub,
+.safety-banner-sub {
+  color: var(--text-muted);
+  max-width: 70ch;
+}
+
+.tracker-banner-cta,
+.safety-banner-cta {
+  margin-top: 0.65rem;
+  align-self: flex-start;
+  background: var(--crimson);
+  color: var(--text-primary);
+  font-weight: 700;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius);
+}
+
+.tracker-banner-card:hover .tracker-banner-cta,
+.safety-banner-card:hover .safety-banner-cta {
+  background: var(--crimson-dark);
+}
+
+
+.tracker-shop-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tracker-shop-card ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-muted);
+}
+
+.safety-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.safety-actions .btn { flex: 1 1 auto; }
+
+.toast-notification {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1200;
+  max-width: 22rem;
+  padding: 0.9rem 1.25rem;
+  background: var(--surface-2);
+  border: 1px solid var(--emerald);
+  border-left: 4px solid var(--emerald);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text-primary);
+  font-weight: 700;
+  opacity: 0;
+  transform: translateX(120%);
+  visibility: hidden;
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
+}
+
+.toast-notification.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+  visibility: visible;
+}
+
+@keyframes estimate-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+  50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0.25); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.est-highlight-pulse {
+  animation: estimate-pulse 0.9s ease-out;
+}
+
 /* Print stylesheet --------------------------------------------------- */
 
 @media print {

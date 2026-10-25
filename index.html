@@ -98,7 +98,7 @@
       <a href="#tire-calc-section">Tire Calculator</a>
       <a href="#booking-section">Book a Bay</a>
       <a href="#bay-tracker-section">Track My Vehicle</a>
-      <a href="#safety-showcase">MTO Safety Certificate</a>
+      <a href="safety.html">MTO Safety Certificate</a>
     </nav>
   </header>
 
@@ -159,7 +159,10 @@
         <h2>What&rsquo;s Going On With Your Vehicle?</h2>
         <p>Tap a symptom and our technician engine recommends the right services &mdash; with plain-English notes.</p>
       </header>
-      <div id="symptom-chips" class="chip-row" aria-label="Vehicle symptoms"></div>
+      <div class="chip-row-wrap">
+        <div id="symptom-chips" class="chip-row" aria-label="Vehicle symptoms"></div>
+        <button id="btn-clear-symptoms" type="button" class="btn btn-sample-alt btn-clear-chips">Clear All Symptoms</button>
+      </div>
       <div id="symptom-recommendations" class="symptom-recommendations" aria-live="polite"></div>
     </section>
 
@@ -180,9 +183,26 @@
     <section class="section" id="safety-precheck-section">
       <header class="section-head">
         <h2>Ontario Safety Standards Certificate (MTO SSC) Pre-Check</h2>
-        <p>Selling or registering a used vehicle, or driving for a rideshare platform in Brampton? Walk the 11 official MTO inspection areas with our interactive pre-check and see your readiness score before booking the certification inspection at 1-15A Fisherman Dr.</p>
+        <p>Selling or registering a used vehicle, or driving for a rideshare platform in Brampton? Ontario requires a Safety Standards Certificate before registration. Launch our interactive 11-point MTO pre-check, see your readiness score, then book the certification inspection at 1-15A Fisherman Dr.</p>
       </header>
-      <div class="safety-layout">
+      <article class="showcase-card">
+        <img src="assets/safety_badge.jpg" alt="Ontario Certified Auto Repair and Safety Standards Inspection Center emblem" class="showcase-img">
+        <div class="showcase-body">
+          <h3>Ontario Safety Standards Certificate (MTO SSC)</h3>
+          <p>We perform the full MTO inspection &mdash; brakes, steering, suspension, tires, lighting, windshield and exhaust &mdash; and issue the certificate on a pass. Walk the official checklist interactively first and catch instant-fail defects before you book. Mention coupon <strong>SAFETY10</strong> to save $10.</p>
+          <ul>
+            <li>Interactive 11-point MTO readiness pre-check with a live score gauge</li>
+            <li>Used-vehicle pre-purchase compliance inspections</li>
+            <li>Rideshare and taxi licensing inspections, exhaust checks included</li>
+          </ul>
+          <a class="safety-banner-card" href="safety.html">
+            <span class="safety-banner-kicker">Free Interactive Tool</span>
+            <span class="safety-banner-title">Launch Interactive MTO Pre-Check &rarr;</span>
+            <span class="safety-banner-sub">Answer pass / fail / unsure across the 11 official inspection areas and get your Ontario certification readiness verdict instantly.</span>
+          </a>
+        </div>
+      </article>
+      <div class="safety-layout" hidden>
         <div id="safety-checklist-container" class="safety-checklist-container" aria-label="Ontario MTO inspection pre-check checklist"></div>
         <aside class="safety-verdict" aria-label="Readiness verdict">
           <div id="safety-score-gauge" class="safety-score-gauge" role="status">
@@ -191,6 +211,8 @@
           </div>
           <div id="safety-summary-alert" class="safety-summary-alert" aria-live="polite"></div>
           <button id="btn-safety-book-inspection" type="button" class="btn btn-primary">Book Official MTO Safety Inspection</button>
+          <button id="btn-safety-reset" type="button" class="btn btn-sample-alt">Reset Pre-Check</button>
+          <button id="btn-safety-cancel" type="button" class="btn btn-sample-alt">Cancel</button>
         </aside>
       </div>
     </section>
@@ -200,7 +222,10 @@
         <h2>Our Services</h2>
         <p>12 core services across Brakes, Tires &amp; Alignment, Computer Diagnostics, Oil &amp; Tune-Up, Air Conditioning and Suspension / Exhaust / Safety Certificate. Select any card to add it to your live estimate.</p>
       </header>
-      <div id="category-filter-bar" class="filter-bar" role="tablist" aria-label="Service categories"></div>
+      <div class="filter-bar-row">
+        <div id="category-filter-bar" class="filter-bar" role="tablist" aria-label="Service categories"></div>
+        <button id="btn-clear-services" type="button" class="btn btn-sample-alt btn-clear-services">Clear Selected Services</button>
+      </div>
       <div id="service-grid" class="service-grid" aria-label="Service catalog"></div>
     </section>
 
@@ -287,7 +312,13 @@
         <h2>Track My Vehicle &mdash; Live Repair Bay Status</h2>
         <p>Follow your repair across our six shop stages, from check-in on Fisherman Dr to the quality road test and pickup. Enter your work order code together with your phone or plate to verify, or load a live sample order.</p>
       </header>
-      <div class="tracker-panel">
+      <a class="tracker-banner-card" href="track.html">
+        <span class="tracker-banner-kicker">Live Repair Bay Tracker</span>
+        <span class="tracker-banner-title">Track Your Vehicle&rsquo;s Live Bay Status on Fisherman Dr &rarr;</span>
+        <span class="tracker-banner-sub">Six-stage progress timeline, bay and technician assignments, and real-time completion estimates &mdash; open the dedicated tracker page anytime.</span>
+        <span class="tracker-banner-cta">Open the Live Bay Tracker</span>
+      </a>
+      <div class="tracker-panel" hidden>
         <div class="tracker-form">
           <div class="tracker-field">
             <label for="tracker-input-code">Work Order Code</label>
@@ -298,6 +329,7 @@
             <input id="tracker-input-phone" type="text" placeholder="Phone or Plate" autocomplete="off">
           </div>
           <button id="btn-track-vehicle" type="button" class="btn btn-primary btn-track">Track My Vehicle</button>
+          <button id="btn-track-clear" type="button" class="btn btn-sample-alt btn-track-clear">Clear / Reset Search</button>
         </div>
         <div class="tracker-samples">
           <button id="btn-track-sample-1" type="button" class="btn btn-sample-alt">Load REV-2048: In Bay</button>
@@ -343,18 +375,6 @@
 
     <section class="section showcase" id="safety-showcase">
       <article class="showcase-card">
-        <img src="assets/safety_badge.jpg" alt="Ontario Certified Auto Repair and Safety Standards Inspection Center emblem" class="showcase-img">
-        <div class="showcase-body">
-          <h3>Ontario Safety Standards Certificate (MTO SSC)</h3>
-          <p>Buying, selling or registering a used vehicle, or joining a rideshare platform? Ontario requires a Safety Standards Certificate before registration. We perform the full MTO inspection &mdash; brakes, steering, suspension, tires, lighting, windshield and exhaust &mdash; and issue the certificate on a pass. Mention coupon <strong>SAFETY10</strong> to save $10.</p>
-          <ul>
-            <li>Used-vehicle pre-purchase compliance inspections</li>
-            <li>Rideshare and taxi licensing inspections</li>
-            <li>Exhaust system checks included</li>
-          </ul>
-        </div>
-      </article>
-      <article class="showcase-card showcase-card-reverse">
         <img src="assets/diagnostics_tech.jpg" alt="State-of-the-art automotive computer diagnostic scanner connected to a modern engine bay" class="showcase-img">
         <div class="showcase-body">
           <h3>State-of-the-Art Computer Diagnostics</h3>
@@ -457,6 +477,8 @@
       </article>
     </div>
   </div>
+
+  <div id="toast-notification" class="toast-notification" role="status" aria-live="polite"></div>
 
   <script src="revolutions_engine.js"></script>
   <script src="app.js"></script>
